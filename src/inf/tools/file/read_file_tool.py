@@ -221,7 +221,7 @@ class ReadFileTool(Tool):  # Khai báo ReadFileTool và kế thừa từ Tool
                         break  # Dừng vòng lặp
 
                     remaining_chars = (  # Tính số ký tự vẫn còn được phép trả về
-                        args.max_chars - chars_read  # Lấy giới hạn trừ số ký tự đã đọc
+                            args.max_chars - chars_read  # Lấy giới hạn trừ số ký tự đã đọc
                     )
 
                     if remaining_chars <= 0:  # Nếu đã hết quota ký tự
@@ -258,8 +258,8 @@ class ReadFileTool(Tool):  # Khai báo ReadFileTool và kế thừa từ Tool
         content = "".join(chunks)  # Ghép các dòng đã đọc thành một chuỗi hoàn chỉnh
 
         has_more = (  # Xác định phía sau còn nội dung chưa đọc hay không
-            actual_end_line is not None  # Phải đọc được ít nhất một dòng
-            and actual_end_line < total_lines  # Dòng cuối vừa đọc chưa phải dòng cuối file
+                actual_end_line is not None  # Phải đọc được ít nhất một dòng
+                and actual_end_line < total_lines  # Dòng cuối vừa đọc chưa phải dòng cuối file
         )
 
         return ReadFileToolResult(  # Trả kết quả đọc file thành công

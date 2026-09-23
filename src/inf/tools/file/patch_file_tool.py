@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass  # Import dataclass để tạo class kết quả tool gọn hơn
 from pathlib import Path  # Import Path để xử lý đường dẫn file và thư mục
 
@@ -28,7 +27,8 @@ class PatchFileToolKwargs(ToolKwargs):  # Khai báo các tham số đầu vào m
         min_length=1,  # Không cho phép old_text là chuỗi rỗng
         description=(  # Mô tả mục đích của old_text
             "Exact existing text to find in the file. "  # Tool sẽ tìm chính xác đoạn text này
-            "The text must match the current file content exactly."  # Nội dung phải giống chính xác với nội dung đang có trong file
+            "The text must match the current file content exactly."
+        # Nội dung phải giống chính xác với nội dung đang có trong file
         )
     )
 
@@ -147,7 +147,8 @@ class PatchFileTool(Tool):  # Khai báo tool patch_file và kế thừa từ Too
                 content=(  # Tạo thông báo lỗi
                     f"Patch is ambiguous because old_text appears "  # Báo rằng đoạn cần sửa không duy nhất
                     f"{occurrences} times in file: {args.path}. "  # Hiển thị số lần xuất hiện
-                    "Provide a more specific old_text or set replace_all=true."  # Yêu cầu src cung cấp đoạn cụ thể hơn hoặc bật replace_all
+                    "Provide a more specific old_text or set replace_all=true."
+                # Yêu cầu src cung cấp đoạn cụ thể hơn hoặc bật replace_all
                 )
             )
 

@@ -1,5 +1,5 @@
 '''Controller là thằng nối Presentation với use case'''
-from src.app.agent import Agent
+from src.app.services.agent import Agent
 from src.pre.controllers.agent.agent_request import AgentRequest
 from src.pre.controllers.agent.agent_response import AgentResponse
 from src.pre.controllers.agent.agent_mapper import AgentMapper

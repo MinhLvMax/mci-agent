@@ -10,6 +10,7 @@ class DDGSToolKwargs(ToolKwargs):
         description="The search query to search on the web."
     )
 
+
 @dataclass
 class DDGSToolResult(ToolResult):
     content: str
@@ -59,6 +60,7 @@ class DDGSTool(Tool):
         return DDGSToolResult(
             content="\n\n".join(output)
         )
+
 
 if __name__ == '__main__':
     tool = DDGSTool()

@@ -1,7 +1,7 @@
 from src.dom.tool import Tool, ToolResult
 
 
-class ToolManager:
+class ToolExecutor:
     def __init__(self, tools: list[Tool]):
         self.tools = tools
         self._tool_map = {

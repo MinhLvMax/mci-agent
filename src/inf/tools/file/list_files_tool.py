@@ -140,8 +140,8 @@ class ListFilesTool(Tool):  # Khai báo tool list_files và kế thừa từ Too
                     )
 
                 except (  # Bắt các lỗi xảy ra khi entry không an toàn
-                    ValueError,  # Có thể xảy ra nếu entry không nằm trong workspace
-                    WorkspacePathError,  # Xảy ra nếu entry resolve ra ngoài workspace
+                        ValueError,  # Có thể xảy ra nếu entry không nằm trong workspace
+                        WorkspacePathError,  # Xảy ra nếu entry resolve ra ngoài workspace
                 ):
                     continue  # Bỏ qua entry không an toàn và chuyển sang entry tiếp theo
 

@@ -1,28 +1,29 @@
-from src.app.tool_manager import ToolManager
-from src.app.model_reasoner import ModelReasoner
+from src.app.services.tool_executor import ToolExecutor
+from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.config import Config
 
+
 class Agent:
     def __init__(
             self,
             model_reasoner: ModelReasoner | None = None,
-            tool_manager: ToolManager | None = None
+            tool_executor: ToolExecutor | None = None
     ):
         self.model_reasoner = model_reasoner
-        self.tool_manager = tool_manager
+        self.tool_executor = tool_executor
 
     def invoke(self, context: Context):
 
         while True:
-            '''Vòng lặp suy nghĩa của src'''
+            '''Vòng lặp suy nghĩa của agent'''
             Config.logger.debug('Thinking...')
 
             decision = self.model_reasoner.decide(
                 context=context,
-                tools=self.tool_manager.tools
+                tools=self.tool_executor.tools
             )
             '''Ra quyết định'''
 
@@ -40,9 +41,10 @@ class Agent:
                 context.add_tool_call_message(
                     tool_calls=decision.tool_calls
                 )
+
                 for call in decision.tool_calls:
                     Config.logger.debug(f'{call.name}, {call.kwargs}')
-                    tool_result = self.tool_manager.execute_tool(
+                    tool_result = self.tool_executor.execute_tool(
                         tool_name=call.name,
                         **call.kwargs,
                     )

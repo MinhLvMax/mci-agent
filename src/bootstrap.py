@@ -8,9 +8,8 @@ from src.inf.tools.file.search_files_tool import SearchFilesTool
 from src.inf.tools.file.write_file_tool import WriteFileTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
-from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
-from src.app.tool_manager import ToolManager
-from src.app.agent import Agent
+from src.app.services.tool_executor import ToolExecutor
+from src.app.services.agent import Agent
 from src.pre.controllers.agent.agent_controller import AgentController
 from src.config import Config
 
@@ -29,26 +28,26 @@ def build_agent_controller():
 
     agent_workspace_dir = Config.AGENT_WORKSPACE
 
-    tool_manager = ToolManager(
+    tool_manager = ToolExecutor(
         tools=[
             # Web
             DDGSTool(),
             OpenURLTool(),
 
             # file
-            GetFileInfoTool(workspace_dir=agent_workspace_dir),
-            ListFilesTool(workspace_dir=agent_workspace_dir),
-            PatchFileTool(workspace_dir=agent_workspace_dir),
-            ReadFileTool(workspace_dir=agent_workspace_dir),
-            SearchFilesTool(workspace_dir=agent_workspace_dir),
-            WriteFileTool(workspace_dir=agent_workspace_dir),
+            # GetFileInfoTool(workspace_dir=agent_workspace_dir),
+            # ListFilesTool(workspace_dir=agent_workspace_dir),
+            # PatchFileTool(workspace_dir=agent_workspace_dir),
+            # ReadFileTool(workspace_dir=agent_workspace_dir),
+            # SearchFilesTool(workspace_dir=agent_workspace_dir),
+            # WriteFileTool(workspace_dir=agent_workspace_dir),
 
         ]
     )
 
     agent = Agent(
         model_reasoner=reasoner,
-        tool_manager=tool_manager,
+        tool_executor=tool_manager,
     )
 
     return AgentController(

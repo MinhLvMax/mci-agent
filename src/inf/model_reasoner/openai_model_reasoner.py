@@ -1,6 +1,6 @@
 import json
 from openai import OpenAI
-from src.app.model_reasoner import ModelReasoner
+from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
 from src.dom.decision import Decision
 from src.dom.tool import Tool

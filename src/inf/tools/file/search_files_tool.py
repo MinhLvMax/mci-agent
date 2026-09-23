@@ -37,7 +37,8 @@ class SearchFilesToolKwargs(ToolKwargs):  # Khai báo các tham số đầu vào
         description=(  # Mô tả cho LLM cách lọc extension
             "Optional list of file extensions to search. "  # Có thể giới hạn loại file cần tìm
             "Examples: ['.txt', '.md', '.json']. "  # Ví dụ các extension hợp lệ
-            "If omitted, all readable UTF-8 text file are searched."  # Nếu không truyền thì thử đọc tất cả file text UTF-8
+            "If omitted, all readable UTF-8 text file are searched."
+        # Nếu không truyền thì thử đọc tất cả file text UTF-8
         )
     )
 
@@ -63,7 +64,8 @@ class SearchFilesToolKwargs(ToolKwargs):  # Khai báo các tham số đầu vào
         ge=50,  # Tối thiểu 50 ký tự
         le=2000,  # Tối đa 2000 ký tự
         description=(  # Mô tả mục đích của max_line_chars
-            "Maximum number of characters to include from each matching line."  # Giới hạn chiều dài snippet của dòng match
+            "Maximum number of characters to include from each matching line."
+        # Giới hạn chiều dài snippet của dòng match
         )
     )
 
@@ -87,7 +89,8 @@ class SearchFilesToolResult(ToolResult):  # Class chứa kết quả của Searc
         if self.truncated:  # Nếu số lượng kết quả vượt quá max_results
             output.extend([  # Thêm cảnh báo vào cuối output
                 "",  # Thêm một dòng trống
-                "[Results truncated because max_results was reached.]"  # Báo src rằng vẫn còn kết quả chưa được hiển thị
+                "[Results truncated because max_results was reached.]"
+                # Báo src rằng vẫn còn kết quả chưa được hiển thị
             ])
 
         return "\n".join(output)  # Ghép toàn bộ danh sách thành một chuỗi nhiều dòng
@@ -180,8 +183,8 @@ class SearchFilesTool(Tool):  # Khai báo tool search_files và kế thừa từ
                     )
 
                 except (  # Bắt các lỗi nếu file không nằm an toàn trong workspace
-                    ValueError,  # Có thể xảy ra nếu path không relative được với workspace
-                    WorkspacePathError,  # Xảy ra nếu resolve ra ngoài workspace
+                        ValueError,  # Có thể xảy ra nếu path không relative được với workspace
+                        WorkspacePathError,  # Xảy ra nếu resolve ra ngoài workspace
                 ):
                     continue  # Bỏ qua file không an toàn
 
@@ -218,8 +221,8 @@ class SearchFilesTool(Tool):  # Khai báo tool search_files và kế thừa từ
 
                     if len(display_line) > args.max_line_chars:  # Nếu dòng quá dài
                         display_line = (  # Cắt bớt nội dung hiển thị
-                            display_line[:args.max_line_chars]  # Chỉ giữ số ký tự tối đa được cho phép
-                            + "..."  # Thêm dấu ... để báo rằng dòng đã bị cắt
+                                display_line[:args.max_line_chars]  # Chỉ giữ số ký tự tối đa được cho phép
+                                + "..."  # Thêm dấu ... để báo rằng dòng đã bị cắt
                         )
 
                     results.append(  # Thêm kết quả match vào danh sách

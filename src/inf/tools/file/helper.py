@@ -40,6 +40,11 @@ class WorkspacePathGuard:  # Class chịu trách nhiệm kiểm soát và giới
             /etc/passwd
         """  # Docstring mô tả chức năng và ví dụ đường dẫn hợp lệ / không hợp lệ
 
+        if not isinstance(relative_path, str):  # Kiểm tra xem có phải dạng chuỗi không, nếu không phải thì ném lỗi
+            raise WorkspacePathError(
+                "Path must be string"
+            )
+
         path = Path(relative_path)  # Chuyển chuỗi relative_path thành đối tượng Path để dễ xử lý
 
         if path.is_absolute():  # Kiểm tra xem src có truyền vào absolute path hay không
@@ -65,6 +70,14 @@ class WorkspacePathGuard:  # Class chịu trách nhiệm kiểm soát và giới
         return resolved_path  # Nếu vượt qua mọi kiểm tra thì trả về absolute path an toàn
 
     def to_relative(self, path: Path) -> str:  # Chuyển một absolute path trong workspace về relative path
-        return str(  # Chuyển đối tượng Path kết quả thành string
-            path.relative_to(self.workspace_dir)  # Lấy đường dẫn tương đối của path so với workspace
-        )
+        try:
+            return str(
+                path.resolve().relative_to(
+                    self.workspace_dir
+                )
+            )
+
+        except ValueError:
+            raise WorkspacePathError(
+                "Path is outside workspace"
+            )

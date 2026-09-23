@@ -1,0 +1,6 @@
+class ConversationRepository:
+    def get_messages(self, conversation_id):
+        ...
+
+    def add_message(self, conversation_id, message):
+        ...

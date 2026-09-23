@@ -57,6 +57,14 @@ class Config:
 
     load_dotenv()  # Load file biến môi trường
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    # OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+    OPEN_API_KEY = os.getenv('OPEN_API_KEY')
 
-    OPEN_API_KEY = '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'
+    # Database
+    DATABASE_URL = (
+        f"postgresql://"
+        f"{os.getenv('DB_USER')}:"
+        f"{os.getenv('DB_PASSWORD')}@"
+        f"{os.getenv('DB_HOST')}:"
+        f"{os.getenv('DB_PORT')}/"
+        f"{os.getenv('DB_NAME')}"
+    )
