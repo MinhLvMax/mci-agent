@@ -5,5 +5,5 @@ from dataclasses import dataclass, field
 class User:
     email: str
     password_hash: str
-    id: str | None = None
+    id: int | None = None
 

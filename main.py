@@ -1,3 +1,3 @@
-from src.pre.cli.terminal import main
+from src.pre.streamlit_ui.root_layout import main
 
 main()

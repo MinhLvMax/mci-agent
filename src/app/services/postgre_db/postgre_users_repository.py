@@ -1,13 +1,13 @@
+import psycopg
 from src.dom.entities.user import User
-from src.dom.repositories.user_repository import UserRepository
 
 
-class PostgresUserRepository(UserRepository):
+class PostgresUsersRepository:
 
-    def __init__(self, connection):
+    def __init__(self, connection: psycopg.Connection):
         self.connection = connection
 
-    def get_by_email(
+    def get_user_by_email(
             self,
             email: str
     ) -> User | None:
@@ -92,14 +92,13 @@ class PostgresUserRepository(UserRepository):
 
 
 if __name__ == '__main__':
-    from src.inf.database.postgre.connection import DatabaseConnection
+    from src.app.services.postgre_db import create_postgres_connection
 
-    dbc = DatabaseConnection()
-    con = dbc.connect()
-    pur = PostgresUserRepository(
-        connection=con
+    dbc = create_postgres_connection()
+    pur = PostgresUsersRepository(
+        connection=dbc
     )
-    
+
     pur.create(
         User(
             email='Minh',

@@ -1,38 +1,37 @@
 from dataclasses import dataclass
 
-from src.dom.repositories.user_repository import UserRepository
+from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
 from src.app.services.password_hasher import PasswordHasher
 
 
 @dataclass
-class LoginUserCommand:
+class SigninUserCommand:
     email: str
     password: str
 
 
 @dataclass
-class LoginUserResult:
-    user_id: int
+class SigninUserResult:
+    user_id: str
     email: str
 
 
-class LoginUserUseCase:
+class SigninUseCase:
 
     def __init__(
             self,
-            user_repository: UserRepository,
-            password_hasher: PasswordHasher
+            user_repository: PostgresUsersRepository,
     ):
         self.user_repository = user_repository
-        self.password_hasher = password_hasher
+        self.password_hasher = PasswordHasher()
 
     def execute(
             self,
-            command: LoginUserCommand
-    ) -> LoginUserResult:
+            command: SigninUserCommand
+    ) -> SigninUserResult:
 
         # Tìm user theo email
-        user = self.user_repository.get_by_email(
+        user = self.user_repository.get_user_by_email(
             command.email
         )
 
@@ -55,7 +54,7 @@ class LoginUserUseCase:
             )
 
         # Login thành công
-        return LoginUserResult(
+        return SigninUserResult(
             user_id=user.id,
             email=user.email
         )

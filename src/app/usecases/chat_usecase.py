@@ -1,20 +1,21 @@
 from dataclasses import dataclass
 
 from src.app.services.agent import Agent
+from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.dom.context import Context
 from src.dom.message.text_message import TextMessage
-from src.dom.repositories.conversation_repository import ConversationRepository
+from src.dom.entities.message import Message
 
 
 @dataclass
 class ChatUseCaseCommand:
     conversation_id: str
-    new_message: TextMessage
+    new_message: Message
 
 
 @dataclass
 class ChatUseCaseResult:
-    message: TextMessage
+    message: Message
 
 
 class ChatUseCase:
@@ -22,7 +23,7 @@ class ChatUseCase:
     def __init__(
             self,
             agent: Agent,
-            conversation_repository: ConversationRepository
+            conversation_repository: PostgreMessegesRepository
     ):
         self.agent = agent
         self.conversation_repository = conversation_repository
@@ -36,7 +37,7 @@ class ChatUseCase:
             conversation_id=command.conversation_id
         )
 
-        # Thêm message mới vào context
+        # Thêm message mới vào lịch sử
         messages = history + [
             command.new_message
         ]
@@ -44,12 +45,17 @@ class ChatUseCase:
         # Gọi agent
         response = self.agent.invoke(
             context=Context(
-                messages=messages
+                messages=[
+                    TextMessage(  # Phải chuyển về dạng text mà agent cần
+                        role=m.role,
+                        content=m.content,
+                    ) for m in messages
+                ]
             )
         )
 
         # Tạo message assistant
-        assistant_message = TextMessage(
+        assistant_message = Message(
             role="assistant",
             content=response
         )
