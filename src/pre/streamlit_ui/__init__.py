@@ -25,3 +25,6 @@ class UIState:
     workspace: list[WorkspaceItem] = field(
         default_factory=list
     )
+    conversation: list = field(
+        default_factory=list
+    )

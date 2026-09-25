@@ -10,25 +10,31 @@ from src.inf.tools.file.write_file_tool import WriteFileTool
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent import Agent
+from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
+from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
+from src.app.services.postgre_db import create_postgres_connection
+from src.app.usecases.chat_usecase import ChatUseCase
 from src.pre.controllers.agent.agent_controller import AgentController
 from src.config import Config
 
 
-def build_agent_controller():
+def build_reasoner():
     # reasoner = GroqModelReasoner(
     #     api_key=Config.GROQ_API_KEY,
     #     model='qwen/qwen3.8-27b'
     # )
 
-    reasoner = OpenAIModelReasoner(
+    return OpenAIModelReasoner(
         api_key=Config.OPEN_API_KEY,
         model="gpt-5.6-luna",
         # model='gpt-5-nano'
     )
 
+
+def build_tool_manager():
     agent_workspace_dir = Config.AGENT_WORKSPACE
 
-    tool_manager = ToolExecutor(
+    return ToolExecutor(
         tools=[
             # Web
             DDGSTool(),
@@ -45,11 +51,15 @@ def build_agent_controller():
         ]
     )
 
-    agent = Agent(
-        model_reasoner=reasoner,
-        tool_executor=tool_manager,
+
+def build_agent_service():
+    return Agent(
+        model_reasoner=build_reasoner(),
+        tool_executor=build_tool_manager(),
     )
 
+
+def build_agent_controller():
     return AgentController(
-        agent=agent
+        agent=build_agent_service()
     )

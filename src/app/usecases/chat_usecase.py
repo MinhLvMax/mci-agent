@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-
 from src.app.services.agent import Agent
 from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.dom.context import Context
@@ -9,8 +8,8 @@ from src.dom.entities.message import Message
 
 @dataclass
 class ChatUseCaseCommand:
-    conversation_id: str
-    new_message: Message
+    conversation_id: int
+    messages: list[Message]
 
 
 @dataclass
@@ -39,7 +38,7 @@ class ChatUseCase:
 
         # Thêm message mới vào lịch sử
         messages = history + [
-            command.new_message
+            command.messages
         ]
 
         # Gọi agent
@@ -63,7 +62,7 @@ class ChatUseCase:
         # Lưu cả user message và assistant message vào db
         self.conversation_repository.add_message(
             conversation_id=command.conversation_id,
-            message=command.new_message
+            message=command.messages
         )
 
         self.conversation_repository.add_message(

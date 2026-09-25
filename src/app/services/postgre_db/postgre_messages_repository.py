@@ -13,7 +13,7 @@ class PostgreMessegesRepository:
 
     def get_messages(
             self,
-            conversation_id: str
+            conversation_id: int
     ) -> list[Message]:
         with self.connection.cursor() as cursor:
             cursor.execute(
@@ -46,7 +46,7 @@ class PostgreMessegesRepository:
 
     def add_message(
             self,
-            conversation_id: str,
+            conversation_id: int,
             message: Message
     ) -> Message:
         with self.connection.cursor() as cursor:

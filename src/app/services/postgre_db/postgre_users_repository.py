@@ -93,16 +93,18 @@ class PostgresUsersRepository:
 
 if __name__ == '__main__':
     from src.app.services.postgre_db import create_postgres_connection
+    from src.app.services.password_hasher import PasswordHasher
 
-    dbc = create_postgres_connection()
-    pur = PostgresUsersRepository(
-        connection=dbc
+    hasher = PasswordHasher()
+    conn = create_postgres_connection()
+    repo = PostgresUsersRepository(
+        connection=conn
     )
 
-    pur.create(
+    repo.create(
         User(
             email='Minh',
-            password_hash='hash123'
+            password_hash=hasher.hash('minh123')
         )
     )
-    print(pur.get_all())
+    print(repo.get_all())

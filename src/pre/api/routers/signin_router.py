@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_users_repository import PostgresUserRepository
+from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
 
 from src.app.usecases.signin_usecase import (
     SigninUseCase,
@@ -15,11 +15,8 @@ class SigninRequest(BaseModel):
     password: str
 
 
-from pydantic import BaseModel
-
-
 class SigninResponse(BaseModel):
-    id: str
+    id: int
     email: str
 
 
@@ -41,7 +38,7 @@ def signin(
     try:
 
         # tạo repository
-        repository = PostgresUserRepository(
+        repository = PostgresUsersRepository(
             connection
         )
 

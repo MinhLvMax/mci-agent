@@ -68,3 +68,14 @@ class Config:
         f"{os.getenv('DB_PORT')}/"
         f"{os.getenv('DB_NAME')}"
     )
+
+    #Authenticate
+
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+    JWT_ALGORITHM = os.getenv('JWT_ALGORITHM')
+    JWT_EXPIRE_MINUTES =os.getenv('JWT_EXPIRE_MINUTES')
+
+if __name__ == '__main__':
+    print(Config.JWT_SECRET_KEY)
+    print(Config.JWT_ALGORITHM)
+    print(Config.JWT_EXPIRE_MINUTES)
