@@ -1,0 +1,21 @@
+[client]
+# Ẩn nút Deploy và menu dành cho developer.
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#4F46E5"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F4F6"
+textColor = "#1F2937"
+borderColor = "#E5E7EB"
+codeTextColor = "#4338CA"
+codeBackgroundColor = "#EEF2FF"
+font = "Inter, 'Segoe UI', system-ui, sans-serif"
+baseFontSize = 15
+baseRadius = "0.6rem"
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F9FAFB"
+secondaryBackgroundColor = "#EEF0F4"

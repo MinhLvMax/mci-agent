@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.app.services.postgre_db import create_postgres_connection
@@ -59,6 +59,13 @@ def signin(
         return SigninResponse(
             id=user.user_id,
             email=user.email
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=401,
+            detail=str(e)
         )
 
     finally:

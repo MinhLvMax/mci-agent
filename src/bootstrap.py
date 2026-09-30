@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.inf.tools.web.ddgs_tool import DDGSTool
 from src.inf.tools.web.open_url_tool import OpenURLTool
 from src.inf.tools.file.get_file_info_tool import GetFileInfoTool
@@ -9,13 +11,15 @@ from src.inf.tools.file.write_file_tool import WriteFileTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 from src.app.services.tool_executor import ToolExecutor
-from src.app.services.agent import Agent
+from src.app.services.agent_service import AgentService
+from src.app.services.workspace_service import WorkspaceService
 from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.usecases.chat_usecase import ChatUseCase
-from src.pre.controllers.agent.agent_controller import AgentController
+# from src.pre.controllers.agent.agent_controller import AgentController
 from src.config import Config
+
 
 
 def build_reasoner():
@@ -31,8 +35,8 @@ def build_reasoner():
     )
 
 
-def build_tool_manager():
-    agent_workspace_dir = Config.AGENT_WORKSPACE
+def build_tool_manager(agent_workspace_dir: Path):
+    # agent_workspace_dir = Config.AGENT_WORKSPACE
 
     return ToolExecutor(
         tools=[
@@ -41,25 +45,36 @@ def build_tool_manager():
             OpenURLTool(),
 
             # file
-            # GetFileInfoTool(workspace_dir=agent_workspace_dir),
-            # ListFilesTool(workspace_dir=agent_workspace_dir),
-            # PatchFileTool(workspace_dir=agent_workspace_dir),
-            # ReadFileTool(workspace_dir=agent_workspace_dir),
-            # SearchFilesTool(workspace_dir=agent_workspace_dir),
-            # WriteFileTool(workspace_dir=agent_workspace_dir),
+            GetFileInfoTool(workspace_dir=agent_workspace_dir),
+            ListFilesTool(workspace_dir=agent_workspace_dir),
+            PatchFileTool(workspace_dir=agent_workspace_dir),
+            ReadFileTool(workspace_dir=agent_workspace_dir),
+            SearchFilesTool(workspace_dir=agent_workspace_dir),
+            WriteFileTool(workspace_dir=agent_workspace_dir),
 
         ]
     )
 
+def build_workspace_service() -> WorkspaceService:
+    """
+    Tạo service quản lý workspace.
 
-def build_agent_service():
-    return Agent(
+    ROOT_AGENT_WORKSPACE là thư mục gốc chứa toàn bộ
+    workspace của các user/conversation.
+    """
+    return WorkspaceService(
+        workspace_root=Config.AGENT_ROOT_WORKSPACE
+    )
+
+def build_agent_service(agent_workspace_dir):
+    return AgentService(
         model_reasoner=build_reasoner(),
-        tool_executor=build_tool_manager(),
+        tool_executor=build_tool_manager(agent_workspace_dir),
     )
 
 
-def build_agent_controller():
-    return AgentController(
-        agent=build_agent_service()
-    )
+# def build_agent_controller():
+#     return AgentController(
+#         agent=build_agent_service()
+#     )
+

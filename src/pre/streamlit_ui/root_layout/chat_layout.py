@@ -1,41 +1,57 @@
 import streamlit as st
+from src.pre.streamlit_ui.state_manager import StateManager
+from src.pre.streamlit_ui.styles import render_empty_state
+
+AVATARS = {
+    "user": ":material/person:",
+    "assistant": ":material/smart_toy:",
+}
 
 
-def render_chat():
-    st.subheader("🤖 Agent")
+def render_chat(
+        messeages_in_current_conversation: list[StateManager.Message],
+        has_conversation: bool,
+        error: str | None,
+        height,
+):
+    """
+    Render khung chat.
 
-    # vùng chat nhỏ hơn viewport
+    Trả về một placeholder nằm cuối danh sách tin nhắn,
+    dùng để hiện trạng thái "Agent đang xử lý" trong lúc chờ backend.
+    """
+
     with st.container(
-            height=520,
-            border=True
+            height=height,
+            border=True,
+            autoscroll=True,
     ):
+        if not has_conversation:
+            render_empty_state(
+                icon=":material/forum:",
+                title="Chưa chọn hội thoại",
+                hint="Chọn một hội thoại ở thanh bên hoặc bấm “Hội thoại mới” để bắt đầu.",
+            )
 
-        for message in st.session_state.messages:
+        elif not messeages_in_current_conversation:
+            render_empty_state(
+                icon=":material/waving_hand:",
+                title="Bạn cần Agent giúp gì?",
+                hint="Agent có thể tìm kiếm web, đọc trang và tạo file trong workspace.",
+            )
+
+        # Messages
+        for message in messeages_in_current_conversation:
             with st.chat_message(
-                    message["role"]
+                    message.role,
+                    avatar=AVATARS.get(message.role),
             ):
-                st.markdown(
-                    message["content"]
-                )
+                st.markdown(message.content)
 
-    # nằm ngoài container
-    prompt = st.chat_input(
-        "Nhập yêu cầu..."
-    )
+        if error:
+            st.error(
+                f"Agent gặp lỗi: {error}",
+                icon=":material/error:",
+            )
 
-    if prompt:
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": prompt
-            }
-        )
-
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": f"Đã nhận: {prompt}"
-            }
-        )
-
-        st.rerun()
+        return st.empty()

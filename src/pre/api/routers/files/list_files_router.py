@@ -1,0 +1,123 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from src.app.services.postgre_db import create_postgres_connection
+from src.app.services.postgre_db.postgre_files_repository import (
+    PostgreFilesRepository
+)
+from src.app.services.postgre_db.postgre_conversations_repository import (
+    PostgreConversationsRepository
+)
+from src.app.services.workspace_sync_service import WorkspaceSyncService
+from src.bootstrap import build_workspace_service
+from src.app.usecases.file_management_usecases.list_files_usecase import (
+    ListFilesUseCase,
+    ListFilesCommand,
+)
+
+from src.dom.entities.file import File
+
+
+# ============================================================
+# REQUEST
+# ============================================================
+
+class ListFilesRequest(BaseModel):
+    """
+    Dữ liệu frontend gửi lên để yêu cầu lấy danh sách file
+    của một conversation.
+    """
+
+    conversation_id: int
+
+
+# ============================================================
+# RESPONSE
+# ============================================================
+
+class ListFilesResponse(BaseModel):
+    """
+    Danh sách metadata file thuộc conversation.
+
+    API này KHÔNG trả nội dung file.
+    Nội dung chỉ được load khi frontend gọi API get_file.
+    """
+
+    files: list[File]
+
+
+# ============================================================
+# ROUTER
+# ============================================================
+
+list_files_router = APIRouter(
+    prefix="/list_files"
+)
+
+
+@list_files_router.post(
+    path="/",
+    response_model=ListFilesResponse,
+)
+def list_files(
+        request: ListFilesRequest
+) -> ListFilesResponse:
+
+    # Mỗi request tạo một PostgreSQL connection.
+    connection = create_postgres_connection()
+
+    try:
+        conversation = PostgreConversationsRepository(
+            connection
+        ).get_by_id(
+            conversation_id=request.conversation_id
+        )
+
+        if conversation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found"
+            )
+
+        # Repository chịu trách nhiệm truy vấn bảng files.
+        repository = PostgreFilesRepository(
+            connection=connection
+        )
+
+        # Filesystem là nguồn sự thật, nên đồng bộ metadata trước khi list.
+        #
+        # Nếu chỉ sync ở cuối request /chat/ thì khi request đó bị lỗi
+        # hoặc bị ngắt giữa chừng, file Agent đã tạo sẽ không bao giờ
+        # xuất hiện trong DB và trên giao diện.
+        workspace_dir = build_workspace_service().get_conversation_workspace(
+            user_id=conversation.user_id,
+            conversation_id=conversation.id,
+        )
+
+        WorkspaceSyncService(
+            files_repository=repository
+        ).sync(
+            conversation_id=conversation.id,
+            workspace_dir=workspace_dir,
+        )
+
+        # Khởi tạo use case.
+        usecase = ListFilesUseCase(
+            files_repository=repository
+        )
+
+        # Chuyển request DTO thành command của application layer.
+        result = usecase.execute(
+            ListFilesCommand(
+                conversation_id=request.conversation_id
+            )
+        )
+
+        # Chuyển kết quả use case thành response API.
+        return ListFilesResponse(
+            files=result.files
+        )
+
+    finally:
+        # Luôn đóng connection dù use case thành công hay lỗi.
+        connection.close()

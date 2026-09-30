@@ -6,7 +6,7 @@ from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.config import Config
 
 
-class Agent:
+class AgentService:
     def __init__(
             self,
             model_reasoner: ModelReasoner | None = None,
@@ -43,7 +43,7 @@ class Agent:
                 )
 
                 for call in decision.tool_calls:
-                    Config.logger.debug(f'{call.name}, {call.kwargs}')
+                    Config.logger.debug(f'{call.name}, {call.kwargs}'[:500])
                     tool_result = self.tool_executor.execute_tool(
                         tool_name=call.name,
                         **call.kwargs,

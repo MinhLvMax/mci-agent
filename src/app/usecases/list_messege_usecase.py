@@ -6,7 +6,6 @@ from src.dom.entities.message import Message
 @dataclass
 class ListMessegeUseCaseCommand:
     conversation_id: int
-    title: str
 
 
 @dataclass

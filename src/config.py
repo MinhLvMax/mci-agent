@@ -52,12 +52,11 @@ class Config:
     DATA = PROJECT_PATH / 'data'
     DATA.mkdir(exist_ok=True, parents=True)
 
-    AGENT_WORKSPACE = DATA / 'agent_workspace'
-    AGENT_WORKSPACE.mkdir(exist_ok=True, parents=True)
-
     load_dotenv()  # Load file biến môi trường
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+    AGENT_ROOT_WORKSPACE = Path(os.getenv('AGENT_ROOT_WORKSPACE'))
+    AGENT_ROOT_WORKSPACE.mkdir(exist_ok=True, parents=True)
 
     # Database
     DATABASE_URL = (
@@ -69,11 +68,12 @@ class Config:
         f"{os.getenv('DB_NAME')}"
     )
 
-    #Authenticate
+    # Authenticate
 
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM')
-    JWT_EXPIRE_MINUTES =os.getenv('JWT_EXPIRE_MINUTES')
+    JWT_EXPIRE_MINUTES = os.getenv('JWT_EXPIRE_MINUTES')
+
 
 if __name__ == '__main__':
     print(Config.JWT_SECRET_KEY)

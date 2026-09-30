@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.app.services.agent import Agent
+from src.app.services.agent_service import AgentService
 from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.dom.context import Context
 from src.dom.message.text_message import TextMessage
@@ -9,7 +9,7 @@ from src.dom.entities.message import Message
 @dataclass
 class ChatUseCaseCommand:
     conversation_id: int
-    messages: list[Message]
+    messages: Message
 
 
 @dataclass
@@ -21,8 +21,9 @@ class ChatUseCase:
 
     def __init__(
             self,
-            agent: Agent,
-            conversation_repository: PostgreMessegesRepository
+            agent: AgentService,
+            conversation_repository,
+
     ):
         self.agent = agent
         self.conversation_repository = conversation_repository

@@ -4,6 +4,7 @@ from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.delete_conversation_usecase import \
     DeleteConversationUseCaseCommand, DeleteConversationUsecase
+from src.bootstrap import build_workspace_service
 
 
 class DeleteConversationRequest(BaseModel):
@@ -28,7 +29,8 @@ def delete_conversation_controller(request: DeleteConversationRequest) -> Delete
     try:
         repository = PostgreConversationsRepository(connection)
         usecase = DeleteConversationUsecase(
-            conversation_repository=repository
+            conversation_repository=repository,
+            workspace_service=build_workspace_service(),
         )
         result = usecase.execute(
             DeleteConversationUseCaseCommand(
