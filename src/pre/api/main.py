@@ -11,6 +11,7 @@ from src.pre.api.routers.files.delete_file_router import delete_file_router
 from src.pre.api.routers.files.get_file_router import get_file_router
 from src.pre.api.routers.files.list_files_router import list_files_router
 from src.pre.api.routers.files.download_file_router import download_file_router
+from src.pre.api.routers.files.upload_file_router import upload_file_router
 
 app = FastAPI()
 
@@ -26,6 +27,7 @@ app.include_router(delete_file_router)
 app.include_router(get_file_router)
 app.include_router(list_files_router)
 app.include_router(download_file_router)
+app.include_router(upload_file_router)
 
 # Lệnh chạy
 # uvicorn src.pre.call_api.main:app --reload

@@ -159,3 +159,24 @@ class StateManager:
             value: OpenedFile | None
     ):
         st.session_state["opened_file"] = value
+
+    # ===
+
+    # Số đếm gắn vào key của st.file_uploader.
+    # Đổi key sau mỗi lần upload thì Streamlit tạo widget mới, ô chọn file trống trở lại.
+    @property
+    def upload_nonce(self) -> int:
+        return st.session_state.get("upload_nonce", 0)  # Mặc định 0 cho lần đầu
+
+    @upload_nonce.setter
+    def upload_nonce(self, value: int):
+        st.session_state["upload_nonce"] = value
+
+    # Lỗi của lần upload gần nhất, mỗi phần tử là một dòng thông báo.
+    @property
+    def upload_errors(self) -> list[str]:
+        return st.session_state.get("upload_errors", [])  # Mặc định không có lỗi
+
+    @upload_errors.setter
+    def upload_errors(self, value: list[str]):
+        st.session_state["upload_errors"] = value

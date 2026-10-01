@@ -1,6 +1,9 @@
+import requests
+
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.composition import APIService
 from src.pre.streamlit_ui.state_manager import StateManager
+from src.pre.call_api.api_client import UnauthorizedError
 from log import get_logger
 
 logger = get_logger(__name__)
@@ -74,6 +77,7 @@ class UIActions:
         # nên phải reset.
         self.state.opened_file = None
         self.state.chat_error = None
+        self.state.upload_errors = []  # Lỗi upload thuộc hội thoại cũ, không hiện ở hội thoại mới
 
     def send_message(self, prompt: str):
         # self.state.messages_in_current_conversation.append(
@@ -183,6 +187,68 @@ class UIActions:
             item_type=response.file.file_type or "",
             content=response.content,
         )
+
+    def open_file_without_preview(
+            self,
+            file_id: int,
+            name: str,
+            item_type: str,
+    ):
+        """
+        Mở khung xem cho file không xem trước được (pdf, ảnh...).
+
+        Không gọi /get_file/ vì backend chỉ đọc được file text,
+        khung xem sẽ chỉ hiện thông báo và nút tải về.
+        """
+
+        self.state.opened_file = StateManager.OpenedFile(
+            file_id=file_id,
+            name=name,
+            item_type=item_type,
+            content=None,  # Không có nội dung để hiển thị
+        )
+
+    def upload_files(
+            self,
+            uploaded_files: list,
+    ) -> list[str]:
+        """
+        Upload các file người dùng chọn vào workspace hiện tại.
+
+        Mỗi file gửi một request riêng để file lỗi không làm hỏng file khác.
+        Trả về danh sách thông báo lỗi, rỗng nghĩa là tất cả thành công.
+        """
+
+        errors: list[str] = []  # Gom lỗi của từng file
+
+        for uploaded in uploaded_files:  # Mỗi phần tử là UploadedFile của Streamlit
+            try:
+                self.api.file_api.upload(
+                    conversation_id=self.state.current_conversation_id,  # Upload vào hội thoại đang mở
+                    file_name=uploaded.name,  # Tên file trên máy người dùng
+                    data=uploaded.getvalue(),  # Toàn bộ nội dung file dạng bytes
+                    mime_type=uploaded.type,  # Loại file trình duyệt nhận diện
+                )
+
+            except UnauthorizedError:  # Hết phiên thì không coi là lỗi của riêng file này
+                raise  # Đẩy lên main.py để đưa về màn hình đăng nhập
+
+            except requests.HTTPError as e:  # Backend trả lỗi 4xx/5xx
+                if e.response.status_code == 413:  # File quá lớn
+                    errors.append(f"{uploaded.name}: vượt quá 50 MB")
+                else:
+                    errors.append(f"{uploaded.name}: {e.response.text}")  # Các lỗi khác hiện nguyên chi tiết
+
+            except requests.RequestException as e:  # Không kết nối được backend
+                errors.append(f"{uploaded.name}: không kết nối được máy chủ ({e})")
+
+        self.state.upload_errors = errors  # Lưu lỗi để giao diện hiển thị sau khi rerun
+
+        self.list_files(  # Tải lại danh sách để thấy file vừa upload
+            conversation_id=self.state.current_conversation_id
+        )
+
+        return errors
 
     def close_file(self):
         """

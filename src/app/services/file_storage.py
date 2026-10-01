@@ -2,6 +2,7 @@ from pathlib import Path
 import csv
 import json
 import mimetypes
+import re
 import shutil
 from typing import Any
 
@@ -227,6 +228,62 @@ class FileStorage:
             )
 
         return file_path
+
+    def write_bytes_unique(
+            self,
+            filename: str,
+            data: bytes,
+    ) -> str:
+        """
+        Ghi nguyên bytes vào thư mục gốc workspace, không bao giờ ghi đè.
+
+        Dùng cho file người dùng upload, hỗ trợ mọi loại file.
+        Nếu tên đã tồn tại thì tự đổi thành "ten (1).ext", "ten (2).ext"...
+
+        Trả về relative path của file đã lưu.
+        """
+
+        safe_name = self._sanitize_filename(filename)  # Làm sạch tên trước khi dùng làm đường dẫn
+
+        stem = Path(safe_name).stem  # Phần tên không gồm đuôi, ví dụ "bao_cao"
+        suffix = Path(safe_name).suffix  # Phần đuôi, ví dụ ".md", có thể rỗng
+
+        candidate = safe_name  # Lần đầu thử đúng tên gốc
+        counter = 0  # Số thứ tự thêm vào tên khi bị trùng
+
+        while True:
+            file_path = self._resolve_path(candidate)  # Vẫn đi qua kiểm tra không thoát khỏi workspace
+
+            try:
+                with file_path.open("xb") as file:  # "x" = chỉ tạo mới, báo lỗi nếu file đã tồn tại
+                    file.write(data)  # Ghi nguyên bytes, không chuyển đổi nội dung
+                return candidate  # Ghi thành công thì trả tên đã dùng
+
+            except FileExistsError:  # Tên này đã có file, kể cả do request khác vừa tạo
+                counter += 1  # Tăng số thứ tự
+                candidate = f"{stem} ({counter}){suffix}"  # Thử tên mới, ví dụ "bao_cao (1).md"
+
+    @staticmethod
+    def _sanitize_filename(
+            filename: str
+    ) -> str:
+        """
+        Biến tên file client gửi lên thành tên an toàn trên Windows.
+
+        "../../evil.txt"  -> "evil.txt"
+        "a:b?.txt"        -> "a_b_.txt"
+        """
+
+        name = Path(filename.replace("\\", "/")).name  # Bỏ mọi phần thư mục, chặn "../" và "C:\..."
+        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name)  # Thay ký tự Windows không cho phép bằng "_"
+        name = name.strip().rstrip(".")  # Windows không cho tên kết thúc bằng dấu chấm hoặc khoảng trắng
+
+        if name in {"", ".", ".."}:  # Không còn gì hợp lệ sau khi làm sạch
+            raise ValueError(
+                f"Invalid file name: {filename}"
+            )
+
+        return name[:200]  # Cắt bớt để còn chỗ cho hậu tố " (n)" và giới hạn đường dẫn Windows
 
     def delete(
             self,

@@ -206,6 +206,51 @@ class FileAPI:
         )
 
     # ========================================================
+    # UPLOAD FILE
+    # ========================================================
+
+    def upload(
+            self,
+            conversation_id: int | str,
+            file_name: str,
+            data: bytes,
+            mime_type: str | None = None,
+    ) -> File:
+        """
+        Upload một file từ máy người dùng vào workspace của conversation.
+
+        API:
+            POST /upload_file/   (multipart/form-data)
+
+        Request:
+            conversation_id: form field
+            file: nội dung file
+
+        Trả về metadata của file đã lưu. Tên có thể khác tên gốc
+        nếu bị trùng, ví dụ "bao_cao (1).md".
+        """
+
+        response = self.client.post(
+            path="/upload_file/",
+            data={
+                "conversation_id": conversation_id,  # Gửi dạng form field, không phải JSON
+            },
+            files={
+                "file": (  # requests tự đóng gói thành multipart
+                    file_name,  # Tên file gốc
+                    data,  # Nội dung file
+                    mime_type or "application/octet-stream",  # Loại file, mặc định là dữ liệu nhị phân
+                ),
+            },
+        )
+
+        response.raise_for_status()
+
+        return self._parse_file(
+            response.json()["file"]  # Dùng lại hàm parse metadata sẵn có
+        )
+
+    # ========================================================
     # DOWNLOAD FILE
     # ========================================================
 
