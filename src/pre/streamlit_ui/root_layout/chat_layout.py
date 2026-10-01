@@ -8,6 +8,30 @@ AVATARS = {
 }
 
 
+def render_tool_call(step: dict):
+    """Một dòng gọi tool, kèm kết quả nếu đã có."""
+    kwargs = ", ".join(f"{k}={v!r}" for k, v in (step.get("kwargs") or {}).items())
+    done = step.get("result") is not None
+    st.markdown(
+        f"{':material/check_circle:' if done else ':material/build:'} "
+        f"`{step['name']}({kwargs})`"
+    )
+    if done:
+        st.code(step["result"], language=None, wrap_lines=True)
+
+
+def render_reasoning(steps: list[dict]):
+    """
+    Vẽ lại các bước suy luận đã lưu (thinking + tool call).
+    Dùng cho tin nhắn cũ, sau khi agent chạy xong.
+    """
+    for step in steps:
+        if step["type"] == "thinking":
+            st.caption(step["text"])
+        elif step["type"] == "tool_call":
+            render_tool_call(step)
+
+
 def render_chat(
         messeages_in_current_conversation: list[StateManager.Message],
         has_conversation: bool,
@@ -46,6 +70,14 @@ def render_chat(
                     message.role,
                     avatar=AVATARS.get(message.role),
             ):
+                if message.reasoning:
+                    with st.expander(
+                            "Suy luận",
+                            icon=":material/psychology:",
+                            expanded=False,
+                    ):
+                        render_reasoning(message.reasoning)
+
                 st.markdown(message.content)
 
         if error:

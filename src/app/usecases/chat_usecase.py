@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from typing import Iterator
 from src.app.services.agent_service import AgentService
+from src.dom.agent_event import AgentEvent
 from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.dom.context import Context
 from src.dom.message.text_message import TextMessage
@@ -74,3 +76,71 @@ class ChatUseCase:
         return ChatUseCaseResult(
             message=assistant_message
         )
+
+    def execute_stream(
+            self,
+            command: ChatUseCaseCommand
+    ) -> Iterator[AgentEvent]:
+        '''
+        Giống execute nhưng yield dần các event của agent cho UI,
+        đồng thời gom các bước suy luận để lưu kèm message assistant.
+        '''
+        history = self.conversation_repository.get_messages(
+            conversation_id=command.conversation_id
+        )
+
+        messages = history + [
+            command.messages
+        ]
+
+        reasoning: list[dict] = []  # [{"type": "thinking", "text"}, {"type": "tool_call", "id", "name", "kwargs", "result"}]
+
+        for event in self.agent.invoke_stream(
+                context=Context(
+                    messages=[
+                        TextMessage(
+                            role=m.role,
+                            content=m.content,
+                        ) for m in messages
+                    ]
+                )
+        ):
+            if event.type == 'thinking':
+                # Các mẩu thinking liền nhau gộp thành một bước
+                if reasoning and reasoning[-1]["type"] == 'thinking':
+                    reasoning[-1]["text"] += event.data["text"]
+                else:
+                    reasoning.append({"type": "thinking", "text": event.data["text"]})
+
+            elif event.type == 'tool_call':
+                reasoning.append({"type": "tool_call", **event.data, "result": None})
+
+            elif event.type == 'tool_result':
+                for step in reasoning:
+                    if step["type"] == 'tool_call' and step["id"] == event.data["id"]:
+                        step["result"] = event.data["result"]
+
+            elif event.type == 'done':
+                assistant_message = Message(
+                    role="assistant",
+                    content=event.data["content"],
+                    reasoning=reasoning or None,
+                )
+
+                self.conversation_repository.add_message(
+                    conversation_id=command.conversation_id,
+                    message=command.messages
+                )
+
+                self.conversation_repository.add_message(
+                    conversation_id=command.conversation_id,
+                    message=assistant_message
+                )
+
+                # Lưu DB xong mới báo done, để UI reload là thấy ngay
+                event = AgentEvent(
+                    type='done',
+                    data={"content": assistant_message.content, "reasoning": assistant_message.reasoning}
+                )
+
+            yield event

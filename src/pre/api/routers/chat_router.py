@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
@@ -15,7 +18,9 @@ from src.app.services.workspace_sync_service import WorkspaceSyncService
 
 from src.app.usecases.chat_usecase import ChatUseCase, ChatUseCaseCommand
 from src.dom.entities.message import Message
+from src.dom.agent_event import AgentEvent
 from src.bootstrap import build_agent_service, build_workspace_service
+from src.config import Config
 
 
 class ChatRequest(BaseModel):
@@ -98,3 +103,74 @@ def chat(
         )
     finally:
         connection.close()
+
+
+@chat_router.post(
+    path='/stream'
+)
+def chat_stream(
+        request: ChatRequest,
+        user_id: int = Depends(get_current_user_id),
+) -> StreamingResponse:
+    '''
+    Giống /chat/ nhưng trả về dần từng event của agent, mỗi dòng là một JSON (NDJSON).
+    Dòng cuối là {"type": "done", ...} hoặc {"type": "error", ...}.
+    '''
+    connection = create_postgres_connection()
+    try:
+        # Kiểm tra quyền trước khi stream để lỗi 403/404 vẫn trả về đúng status code
+        conversation = get_owned_conversation(
+            PostgreConversationsRepository(connection),
+            conversation_id=request.conversation_id,
+            user_id=user_id,
+        )
+    except Exception:
+        connection.close()
+        raise
+
+    conversation_workspace_dir = build_workspace_service().get_conversation_workspace(
+        user_id=conversation.user_id,
+        conversation_id=conversation.id,
+    )
+
+    def event_lines():
+        # Connection phải sống tới khi stream xong nên mọi thứ nằm trong generator
+        try:
+            usecase = ChatUseCase(
+                agent=build_agent_service(conversation_workspace_dir),
+                conversation_repository=PostgreMessegesRepository(connection)
+            )
+            try:
+                for event in usecase.execute_stream(
+                        ChatUseCaseCommand(
+                            conversation_id=request.conversation_id,
+                            messages=Message(
+                                role='user',
+                                content=request.new_message,
+                            )
+                        )
+                ):
+                    yield json.dumps(event.to_dict(), ensure_ascii=False) + "\n"
+            except Exception as e:
+                # Status 200 đã gửi đi rồi, chỉ còn cách báo lỗi bằng một event
+                Config.logger.exception('Chat stream failed')
+                yield json.dumps(
+                    AgentEvent(type='error', data={"message": str(e)}).to_dict(),
+                    ensure_ascii=False
+                ) + "\n"
+            finally:
+                # Agent có thể đã đổi file trong workspace -> đồng bộ lại metadata như /chat/
+                connection.rollback()
+                WorkspaceSyncService(
+                    files_repository=PostgreFilesRepository(connection=connection)
+                ).sync(
+                    conversation_id=conversation.id,
+                    workspace_dir=conversation_workspace_dir,
+                )
+        finally:
+            connection.close()
+
+    return StreamingResponse(
+        event_lines(),
+        media_type="application/x-ndjson",
+    )

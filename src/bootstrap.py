@@ -11,6 +11,7 @@ from src.inf.tools.file.write_file_tool import WriteFileTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
+from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
 from src.app.services.workspace_service import WorkspaceService
@@ -24,9 +25,17 @@ from src.config import Config
 
 
 def build_reasoner():
-    return GroqModelReasoner(
-        api_key=Config.GROQ_API_KEY,
-        model='qwen/qwen3.8-27b'
+    # return GroqModelReasoner(
+    #     api_key=Config.GROQ_API_KEY,
+    #     model='qwen/qwen3.8-27b'
+    # )
+
+    return OllamaModelReasoner(
+        # host=Config.OLLAMA_HOST,
+        # model='qwen3:0.6b',
+        model='gpt-oss:120b',
+        api_key=Config.OLLAMA_API_KEY,
+        think='medium',  # gpt-oss chỉ nhận 'low'/'medium'/'high', qwen3 thì dùng True/False
     )
 
     # return OpenAIModelReasoner(

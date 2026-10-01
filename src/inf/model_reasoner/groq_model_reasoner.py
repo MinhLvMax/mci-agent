@@ -1,4 +1,5 @@
 import json
+from typing import Generator
 from groq import Groq
 
 from src.app.ports.model_reasoner import ModelReasoner
@@ -12,6 +13,7 @@ from src.dom.message.tool_result_message import ToolResultMessage
 from src.dom.tool_call import ToolCall
 from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.dom.decision.final_decision import FinalDecision
+from src.dom.agent_event import AgentEvent
 from src.config import Config
 
 
@@ -58,6 +60,11 @@ class GroqModelReasoner(ModelReasoner):
         return FinalDecision(
             final_content=message.content or ""
         )
+
+    def decide_stream(self, context: Context, tools: list[Tool]) -> Generator[AgentEvent, None, Decision]:
+        '''Chưa stream với Groq: gọi decide như cũ, không phát event thinking nào'''
+        return self.decide(context, tools)
+        yield  # Có yield thì Python mới coi hàm này là generator
 
     def _convert_message(self, message: BaseMessage) -> dict:
         '''Chuyển đổi các message của nghiệp vụ thành dạng mà groq hiểu và làm việc'''

@@ -72,6 +72,7 @@ class StateManager:
     class Message:
         role: Literal['user', 'assistant']
         content: str
+        reasoning: list[dict] | None = None  # Các bước suy luận/gọi tool, hiện trong expander
 
     @property
     def messages_in_current_conversation(self) -> list[Message]:

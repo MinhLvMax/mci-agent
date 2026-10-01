@@ -3,7 +3,7 @@ from datetime import datetime
 import streamlit as st
 from src.pre.streamlit_ui.styles import render_empty_state
 from src.pre.streamlit_ui.root_layout.workspace_layout import render_workspace
-from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, AVATARS
+from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, render_tool_call, AVATARS
 from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
@@ -111,18 +111,70 @@ def root_layout(
                     "assistant",
                     avatar=AVATARS["assistant"],
             ):
-                with st.spinner(
-                        "Agent đang xử lý...",
-                        show_time=True,
-                ):
-                    try:
-                        actions.send_message(pending_prompt)
-                    except UnauthorizedError:  # Hết phiên thì không hiện như lỗi chat
-                        raise  # Đẩy lên main.py để đưa user về màn hình đăng nhập
-                    except Exception as e:
-                        state_manager.chat_error = str(e)
+                render_agent_stream(
+                    actions.send_message_stream(pending_prompt),
+                    state_manager,
+                )
 
         st.rerun()
+
+
+def render_agent_stream(
+        events,
+        state_manager: StateManager,
+):
+    """
+    Vẽ dần suy luận và câu trả lời trong lúc agent đang chạy.
+
+    Thinking và tool call nằm trong khung status, câu trả lời nằm bên dưới.
+    Xong thì thu gọn status, sau rerun tin nhắn được vẽ lại từ state.
+    """
+
+    status = st.status("Đang suy nghĩ...", expanded=True)
+    answer_slot = st.empty()
+
+    thinking_slot = None  # Ô đang hiện đoạn thinking hiện tại
+    thinking_text = ""
+    answer_text = ""
+    tool_slots = {}  # id tool call -> (ô hiển thị, dữ liệu tool call) để cập nhật khi có kết quả
+
+    try:
+        for event in events:
+            data = event["data"]
+
+            if event["type"] == "thinking":
+                if thinking_slot is None:
+                    thinking_slot = status.empty()
+                    thinking_text = ""
+                thinking_text += data["text"]
+                thinking_slot.caption(thinking_text)
+
+            elif event["type"] == "tool_call":
+                thinking_slot = None  # Sau tool call thì thinking mới là một đoạn mới
+                status.update(label=f"Đang chạy {data['name']}...")
+                slot = status.empty()
+                tool_slots[data["id"]] = (slot, data)
+                with slot.container():
+                    render_tool_call(data)
+
+            elif event["type"] == "tool_result":
+                status.update(label="Đang suy nghĩ...")
+                slot, call = tool_slots[data["id"]]
+                with slot.container():
+                    render_tool_call({**call, "result": data["result"]})
+
+            elif event["type"] == "content":
+                answer_text += data["text"]
+                answer_slot.markdown(answer_text)
+
+            elif event["type"] == "done":
+                status.update(label="Đã suy nghĩ xong", state="complete", expanded=False)
+
+    except UnauthorizedError:  # Hết phiên thì không hiện như lỗi chat
+        raise  # Đẩy lên main.py để đưa user về màn hình đăng nhập
+    except Exception as e:
+        status.update(label="Agent gặp lỗi", state="error")
+        state_manager.chat_error = str(e)
 
 
 def render_welcome(

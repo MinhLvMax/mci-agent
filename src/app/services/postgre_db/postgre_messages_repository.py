@@ -1,4 +1,5 @@
 import psycopg
+from psycopg.types.json import Jsonb
 
 from src.dom.entities.message import Message
 
@@ -20,7 +21,8 @@ class PostgreMessegesRepository:
                 """
                 SELECT
                     role,
-                    content
+                    content,
+                    metadata
                 FROM messages
                 WHERE conversation_id = %s
                 ORDER BY created_at ASC
@@ -35,10 +37,12 @@ class PostgreMessegesRepository:
         messages = []
 
         for row in rows:
+            metadata = row[2] or {}  # psycopg tự đọc JSONB thành dict, tin nhắn cũ thì là NULL
             messages.append(
                 Message(
                     role=row[0],
-                    content=row[1]
+                    content=row[1],
+                    reasoning=metadata.get("reasoning"),
                 )
             )
 
@@ -55,9 +59,11 @@ class PostgreMessegesRepository:
                 INSERT INTO messages(
                     conversation_id,
                     role,
-                    content
+                    content,
+                    metadata
                 )
                 VALUES(
+                    %s,
                     %s,
                     %s,
                     %s
@@ -67,10 +73,21 @@ class PostgreMessegesRepository:
                 (
                     conversation_id,
                     message.role,
-                    message.content
+                    message.content,
+                    self._to_metadata(message),
                 )
             )
 
         self.connection.commit()
 
         return message
+
+    def _to_metadata(self, message: Message) -> Jsonb | None:
+        '''
+        Gom các thông tin phụ của message vào cột metadata (JSONB).
+        Sau này muốn lưu thêm (model, token...) thì thêm key vào đây.
+        '''
+        metadata = {}
+        if message.reasoning:
+            metadata["reasoning"] = message.reasoning
+        return Jsonb(metadata) if metadata else None

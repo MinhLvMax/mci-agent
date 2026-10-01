@@ -6,6 +6,7 @@ from src.pre.call_api.api_client import APIClient
 class Message:
     role: str
     content: str
+    reasoning: list[dict] | None = None
 
 
 @dataclass
@@ -32,7 +33,8 @@ class MessageAPI:
             messages=[
                 Message(
                     role=m['role'],
-                    content=m['content']
+                    content=m['content'],
+                    reasoning=m.get('reasoning'),
                 )
                 for m in data['messages']
             ]

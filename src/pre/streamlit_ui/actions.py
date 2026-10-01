@@ -1,3 +1,5 @@
+from typing import Iterator
+
 import requests
 
 from src.pre.streamlit_ui.state_manager import StateManager
@@ -77,7 +79,7 @@ class UIActions:
         # Load msgs
         response = self.api.message_api.list(conversation_id)
         self.state.messages_in_current_conversation = [
-            StateManager.Message(role=m.role, content=m.content)
+            StateManager.Message(role=m.role, content=m.content, reasoning=m.reasoning)
             for m in response.messages
         ]
         # Load files meta
@@ -107,6 +109,37 @@ class UIActions:
         # Agent có thể vừa tạo/xóa/sửa file.
         # Vì vậy sau mỗi lượt Agent chạy xong,
         # refresh lại metadata workspace.
+        self.list_files(
+            conversation_id=self.state.current_conversation_id
+        )
+
+    def send_message_stream(self, prompt: str) -> Iterator[dict]:
+        """
+        Giống send_message nhưng yield dần từng event để layout vẽ suy luận.
+
+        Action không tự vẽ gì, chỉ chuyển event lên layout;
+        khi xong thì cập nhật state như send_message.
+        """
+
+        for event in self.api.chat_api.chat_stream(
+                conversation_id=self.state.current_conversation_id,
+                new_message=prompt,
+        ):
+            if event["type"] == "error":
+                raise RuntimeError(event["data"]["message"])
+
+            if event["type"] == "done":
+                self.state.messages_in_current_conversation.append(
+                    StateManager.Message(
+                        role="assistant",
+                        content=event["data"]["content"],
+                        reasoning=event["data"].get("reasoning"),
+                    )
+                )
+
+            yield event
+
+        # Agent có thể vừa tạo/xóa/sửa file.
         self.list_files(
             conversation_id=self.state.current_conversation_id
         )
