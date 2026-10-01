@@ -1,4 +1,7 @@
+from datetime import datetime
+
 import streamlit as st
+from src.pre.streamlit_ui.styles import render_empty_state
 from src.pre.streamlit_ui.root_layout.workspace_layout import render_workspace
 from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, AVATARS
 from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar
@@ -54,6 +57,10 @@ def root_layout(
         current_conversation,
         state_manager,
     )
+
+    if not has_conversation:  # Chưa chọn hoặc tạo hội thoại
+        render_welcome(actions)  # Chỉ hiện màn hình chào, không vẽ khung chat và workspace
+        return  # Không có hội thoại thì không có gì để chat hay upload
 
     left, right = st.columns(
         [3, 2],
@@ -116,6 +123,38 @@ def root_layout(
                         state_manager.chat_error = str(e)
 
         st.rerun()
+
+
+def render_welcome(
+        actions: UIActions,
+):
+    """
+    Màn hình khi chưa có hội thoại nào được chọn.
+    """
+
+    _, center, _ = st.columns([1, 2, 1])  # Hai cột ngoài để căn giữa nội dung
+
+    with center:
+        render_empty_state(  # Dùng lại khối thông báo căn giữa sẵn có
+            icon=":material/forum:",
+            title="Chưa chọn hội thoại",
+            hint="Chọn một hội thoại ở thanh bên hoặc bắt đầu hội thoại mới để chat với Agent và dùng workspace.",
+        )
+
+        if st.button(
+                "Bắt đầu hội thoại mới",
+                icon=":material/add:",
+                type="primary",
+                width="stretch",
+                key="welcome_new_conversation",  # Key riêng để không trùng nút trên sidebar
+        ):
+            actions.create_new_conversation(  # Cùng logic với nút "Hội thoại mới" ở sidebar
+                title=datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+            )
+
+            st.rerun()  # Vẽ lại để hiện khung chat và workspace của hội thoại vừa tạo
 
 
 def render_header(

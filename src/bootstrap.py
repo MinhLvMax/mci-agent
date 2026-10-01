@@ -10,6 +10,7 @@ from src.inf.tools.file.search_files_tool import SearchFilesTool
 from src.inf.tools.file.write_file_tool import WriteFileTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
+from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
 from src.app.services.workspace_service import WorkspaceService
@@ -22,18 +23,17 @@ from src.app.services.jwt_service import JWTService
 from src.config import Config
 
 
-
 def build_reasoner():
-    # reasoner = GroqModelReasoner(
-    #     api_key=Config.GROQ_API_KEY,
-    #     model='qwen/qwen3.8-27b'
-    # )
-
-    return OpenAIModelReasoner(
-        api_key=Config.OPEN_API_KEY,
-        model="gpt-5.6-luna",
-        # model='gpt-5-nano'
+    return GroqModelReasoner(
+        api_key=Config.GROQ_API_KEY,
+        model='qwen/qwen3.8-27b'
     )
+
+    # return OpenAIModelReasoner(
+    #     api_key=Config.OPEN_API_KEY,
+    #     model="gpt-5.6-luna",
+    #     # model='gpt-5-nano'
+    # )
 
 
 def build_tool_manager(agent_workspace_dir: Path):
@@ -56,6 +56,7 @@ def build_tool_manager(agent_workspace_dir: Path):
         ]
     )
 
+
 def build_workspace_service() -> WorkspaceService:
     """
     Tạo service quản lý workspace.
@@ -66,6 +67,7 @@ def build_workspace_service() -> WorkspaceService:
     return WorkspaceService(
         workspace_root=Config.AGENT_ROOT_WORKSPACE
     )
+
 
 def build_jwt_service() -> JWTService:
     return JWTService(
@@ -81,9 +83,7 @@ def build_agent_service(agent_workspace_dir):
         tool_executor=build_tool_manager(agent_workspace_dir),
     )
 
-
 # def build_agent_controller():
 #     return AgentController(
 #         agent=build_agent_service()
 #     )
-

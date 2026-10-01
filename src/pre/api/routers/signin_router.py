@@ -6,7 +6,8 @@ from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRe
 
 from src.app.usecases.signin_usecase import (
     SigninUseCase,
-    SigninUserCommand
+    SigninUserCommand,
+    InactiveAccountError,
 )
 from src.bootstrap import build_jwt_service
 
@@ -64,6 +65,13 @@ def signin(
             id=user.user_id,
             email=user.email,
             access_token=user.access_token  # Gửi token về cho client
+        )
+
+    except InactiveAccountError as e:  # Đúng mật khẩu nhưng chưa được duyệt
+
+        raise HTTPException(
+            status_code=403,  # 403 = đã xác thực đúng nhưng không được phép vào
+            detail=str(e)
         )
 
     except Exception as e:

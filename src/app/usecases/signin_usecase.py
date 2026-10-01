@@ -4,6 +4,10 @@ from src.app.services.password_hasher import PasswordHasher
 from src.app.services.jwt_service import JWTService
 
 
+class InactiveAccountError(Exception):
+    """Đúng mật khẩu nhưng tài khoản chưa được quản trị viên kích hoạt."""
+
+
 @dataclass
 class SigninUserCommand:
     email: str
@@ -54,6 +58,12 @@ class SigninUseCase:
         if not is_valid:
             raise Exception(
                 "Invalid email or password"
+            )
+
+        # Kiểm tra sau mật khẩu để người đoán sai không biết được trạng thái tài khoản
+        if not user.is_active:  # Tài khoản chưa được duyệt hoặc đã bị khóa
+            raise InactiveAccountError(
+                "Account is not active"
             )
 
         access_token = self.jwt_service.create_access_token(  # Chỉ tạo token khi email và mật khẩu đều đúng

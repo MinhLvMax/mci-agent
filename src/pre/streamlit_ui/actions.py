@@ -26,6 +26,17 @@ class UIActions:
         self.api.client.access_token = response.access_token  # Gắn ngay vào client cho các request còn lại của lượt chạy này
         self.state.auth_notice = None  # Đăng nhập lại thành công thì bỏ thông báo hết phiên
 
+    def signup(self, email: str, password: str) -> bool:
+        """
+        Tạo tài khoản mới.
+
+        Không tự đăng nhập vì tài khoản phải chờ quản trị viên duyệt.
+        Trả về is_active để giao diện chọn thông báo phù hợp.
+        """
+
+        response = self.api.signin_api.signup(email, password)  # Lỗi được ném lên để form hiển thị
+        return response.is_active
+
     def logout(self):
         """
         Đăng xuất ở phía UI.
@@ -218,6 +229,10 @@ class UIActions:
         Mỗi file gửi một request riêng để file lỗi không làm hỏng file khác.
         Trả về danh sách thông báo lỗi, rỗng nghĩa là tất cả thành công.
         """
+
+        if self.state.current_conversation_id is None:  # Phòng hờ: không có hội thoại thì không biết lưu vào đâu
+            self.state.upload_errors = ["Hãy chọn hoặc tạo một hội thoại trước khi tải file lên."]
+            return self.state.upload_errors
 
         errors: list[str] = []  # Gom lỗi của từng file
 

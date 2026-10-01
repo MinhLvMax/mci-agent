@@ -17,11 +17,12 @@ class PostgresUsersRepository:
                 SELECT
                     id,
                     email,
-                    password_hash
+                    password_hash,
+                    is_active
                 FROM users
-                WHERE email = %s
-                """,
-                (email,)
+                WHERE lower(email) = lower(%s)
+                """,  # So sánh không phân biệt hoa thường: "A@x.com" và "a@x.com" là một tài khoản
+                (email.strip(),)  # Bỏ khoảng trắng thừa user lỡ gõ
             )
 
             row = cursor.fetchone()
@@ -32,7 +33,8 @@ class PostgresUsersRepository:
         return User(
             id=row[0],
             email=row[1],
-            password_hash=row[2]
+            password_hash=row[2],
+            is_active=row[3]  # Trạng thái kích hoạt để đăng nhập kiểm tra
         )
 
     def create(
@@ -44,14 +46,16 @@ class PostgresUsersRepository:
                 """
                 INSERT INTO users(
                     email,
-                    password_hash
+                    password_hash,
+                    is_active
                 )
-                VALUES(%s, %s)
+                VALUES(%s, %s, %s)
                 RETURNING id
-                """,
+                """,  # Ghi rõ is_active thay vì dựa vào mặc định của DB
                 (
                     user.email,
-                    user.password_hash
+                    user.password_hash,
+                    user.is_active
                 )
             )
 
