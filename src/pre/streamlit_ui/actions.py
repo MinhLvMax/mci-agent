@@ -181,6 +181,21 @@ class UIActions:
 
         self.state.opened_file = None
 
+    def download_file(
+            self,
+            file_id: int
+    ) -> bytes:
+        """
+        Lấy bytes của file để st.download_button gửi về máy user.
+
+        Hàm này được st.download_button gọi trên thread riêng,
+        chỉ khi user bấm nút, nên không được đụng tới session state.
+        """
+
+        return self.api.file_api.download(
+            file_id=file_id
+        )
+
     def delete_file(
             self,
             file_id: int

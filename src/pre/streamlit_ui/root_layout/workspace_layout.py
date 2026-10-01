@@ -87,10 +87,10 @@ def render_file_list(
 
             # Một hàng gồm:
             #
-            # [file name........] [size] [delete]
+            # [file name........] [size] [delete] [download]
             #
-            file_col, size_col, delete_col = st.columns(
-                [7, 2, 1],
+            file_col, size_col, delete_col, download_col = st.columns(
+                [7, 2, 1, 1],
                 vertical_alignment="center",
             )
 
@@ -141,6 +141,28 @@ def render_file_list(
                     )
 
                     st.rerun()
+
+            # -------------------------
+            # DOWNLOAD FILE
+            # -------------------------
+
+            with download_col:
+
+                # data là hàm nên chỉ gọi API khi user bấm nút,
+                # không tải trước toàn bộ file mỗi lần render.
+                # file_id=item.file_id để mỗi lambda giữ đúng file của hàng này.
+                st.download_button(
+                    ":material/download:",
+                    data=lambda file_id=item.file_id: action.download_file(
+                        file_id=file_id
+                    ),
+                    file_name=item.name,
+                    mime=item.mime_type or "application/octet-stream",
+                    key=f"download_file_{item.file_id}",
+                    type="tertiary",
+                    help="Tải file",
+                    on_click="ignore",
+                )
 
 
 def render_file_preview(

@@ -20,37 +20,17 @@ from src.app.usecases.file_management_usecases.get_file_content_usecase import (
 from src.dom.entities.file import File
 from src.config import Config
 
-
-# ============================================================
-# REQUEST
-# ============================================================
-
 class GetFileRequest(BaseModel):
-    """
-    Frontend chỉ cần gửi ID của file, gửi thêm conversation id để tìm workspace path
-    Không cho frontend gửi path trực tiếp vì path phải được
-    lấy từ metadata đã lưu trong PostgreSQL.
-    """
     file_id: int
-
-
-# ============================================================
-# RESPONSE
-# ============================================================
 
 class GetFileResponse(BaseModel):
     file: File
     content: Any
 
 
-# ============================================================
-# ROUTER
-# ============================================================
-
 get_file_router = APIRouter(
     prefix="/get_file"
 )
-
 
 @get_file_router.post(
     path="/",

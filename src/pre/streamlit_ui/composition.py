@@ -24,7 +24,7 @@ class APIService:
 
 def build_api_service():
     api_client = APIClient(
-        base_url='http://localhost:8000'
+        base_url='http://127.0.0.1:8000'
     )
     chat_api = ChatAPI(
         client=api_client

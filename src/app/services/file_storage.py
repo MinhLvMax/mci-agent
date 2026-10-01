@@ -267,6 +267,34 @@ class FileStorage:
 
         return self._resolve_path(path).exists()
 
+    def get_path(
+            self,
+            path: str
+    ) -> Path:
+        """
+        Trả về absolute path an toàn của một file trong workspace.
+
+        Khác với read():
+        - không parse nội dung theo extension;
+        - dùng được cho mọi loại file (pdf, png, xlsx...).
+
+        Dùng khi cần trả nguyên file gốc, ví dụ API tải file.
+        """
+
+        file_path = self._resolve_path(path)
+
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"File not found: {path}"
+            )
+
+        if not file_path.is_file():
+            raise ValueError(
+                f"Path is not a file: {path}"
+            )
+
+        return file_path
+
     def get_size(
             self,
             path: str

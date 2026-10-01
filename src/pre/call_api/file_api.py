@@ -206,6 +206,40 @@ class FileAPI:
         )
 
     # ========================================================
+    # DOWNLOAD FILE
+    # ========================================================
+
+    def download(
+            self,
+            file_id: int | str
+    ) -> bytes:
+        """
+        Tải nguyên bytes của file gốc.
+
+        API:
+            POST /download_file/
+
+        Request:
+            {
+                "file_id": 15
+            }
+
+        Backend trả file chứ không trả JSON,
+        nên đọc response.content thay vì response.json().
+        """
+
+        response = self.client.post(
+            path="/download_file/",
+            json={
+                "file_id": file_id,
+            },
+        )
+
+        response.raise_for_status()
+
+        return response.content
+
+    # ========================================================
     # HELPER
     # ========================================================
 
