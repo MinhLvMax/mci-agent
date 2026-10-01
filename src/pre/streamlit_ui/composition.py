@@ -9,12 +9,14 @@ from src.pre.call_api.file_api import FileAPI
 class APIService:
     def __init__(
             self,
+            client: APIClient,
             chat_api: ChatAPI,
             signin_api: SigninAPI,
             conversations_api: ConversationAPI,
             message_api: MessageAPI,
             file_api: FileAPI,
     ):
+        self.client = client  # Giữ client để cập nhật token ngay sau khi đăng nhập
         self.chat_api = chat_api
         self.signin_api = signin_api
         self.conversations_api = conversations_api
@@ -22,9 +24,10 @@ class APIService:
         self.file_api = file_api
 
 
-def build_api_service():
+def build_api_service(access_token: str | None = None):
     api_client = APIClient(
-        base_url='http://127.0.0.1:8000'
+        base_url='http://127.0.0.1:8000',
+        access_token=access_token  # Token đã lưu trong session, None nếu chưa đăng nhập
     )
     chat_api = ChatAPI(
         client=api_client
@@ -43,6 +46,7 @@ def build_api_service():
     )
 
     return APIService(
+        api_client,
         chat_api,
         signin_api,
         conversations_api,

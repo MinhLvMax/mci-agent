@@ -6,6 +6,7 @@ from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
 from src.pre.streamlit_ui.root_layout.login_layout import render_login
 from src.pre.streamlit_ui.styles import inject_styles
+from src.pre.call_api.api_client import UnauthorizedError
 
 CHAT_HEIGHT = 600
 
@@ -109,6 +110,8 @@ def root_layout(
                 ):
                     try:
                         actions.send_message(pending_prompt)
+                    except UnauthorizedError:  # Hết phiên thì không hiện như lỗi chat
+                        raise  # Đẩy lên main.py để đưa user về màn hình đăng nhập
                     except Exception as e:
                         state_manager.chat_error = str(e)
 

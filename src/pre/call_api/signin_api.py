@@ -6,6 +6,7 @@ from src.pre.call_api.api_client import APIClient
 class SigninResponse:
     id: int
     email: str
+    access_token: str  # Token backend cấp sau khi đăng nhập đúng
 
 
 class SigninAPI:
@@ -29,5 +30,6 @@ class SigninAPI:
         data = response.json()
         return SigninResponse(
             id=data['id'],
-            email=data['email']
+            email=data['email'],
+            access_token=data['access_token']  # Lấy token từ response đăng nhập
         )

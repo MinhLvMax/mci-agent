@@ -8,6 +8,7 @@ from src.app.usecases.signin_usecase import (
     SigninUseCase,
     SigninUserCommand
 )
+from src.bootstrap import build_jwt_service
 
 
 class SigninRequest(BaseModel):
@@ -18,6 +19,8 @@ class SigninRequest(BaseModel):
 class SigninResponse(BaseModel):
     id: int
     email: str
+    access_token: str  # Token client dùng cho các request sau
+    token_type: str = "bearer"  # Báo client gửi token theo dạng "Authorization: Bearer <token>"
 
 
 signin_router = APIRouter(
@@ -44,7 +47,8 @@ def signin(
 
         # tạo usecase
         usecase = SigninUseCase(
-            repository
+            repository,
+            jwt_service=build_jwt_service()  # Truyền service tạo token vào usecase
         )
 
         # gọi nghiệp vụ login
@@ -58,7 +62,8 @@ def signin(
         # trả response
         return SigninResponse(
             id=user.user_id,
-            email=user.email
+            email=user.email,
+            access_token=user.access_token  # Gửi token về cho client
         )
 
     except Exception as e:

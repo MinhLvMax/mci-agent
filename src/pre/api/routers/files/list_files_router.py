@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_files_repository import (
@@ -60,24 +62,19 @@ list_files_router = APIRouter(
     response_model=ListFilesResponse,
 )
 def list_files(
-        request: ListFilesRequest
+        request: ListFilesRequest,
+        user_id: int = Depends(get_current_user_id),  # User id lấy từ token
 ) -> ListFilesResponse:
 
     # Mỗi request tạo một PostgreSQL connection.
     connection = create_postgres_connection()
 
     try:
-        conversation = PostgreConversationsRepository(
-            connection
-        ).get_by_id(
-            conversation_id=request.conversation_id
+        conversation = get_owned_conversation(  # Chỉ cho xem file trong conversation của chính mình
+            PostgreConversationsRepository(connection),
+            conversation_id=request.conversation_id,
+            user_id=user_id,
         )
-
-        if conversation is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Conversation not found"
-            )
 
         # Repository chịu trách nhiệm truy vấn bảng files.
         repository = PostgreFilesRepository(

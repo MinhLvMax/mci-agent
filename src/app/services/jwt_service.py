@@ -36,7 +36,8 @@ class JWTService:
         payload = jwt.decode(
             token,
             self.secret_key,
-            algorithms=[self.algorithm]
+            algorithms=[self.algorithm],
+            options={"require": ["exp", "sub"]}  # Từ chối token thiếu hạn dùng hoặc thiếu user id
         )
 
         return int(payload["sub"])

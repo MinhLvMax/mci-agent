@@ -29,9 +29,29 @@ def render_sidebar(
             # không tự biến email thành link.
             email = user.email.replace("@", "​@")
 
-            st.caption(
-                f":material/account_circle: {email}"
+            # Một hàng gồm:
+            #
+            # [email.............] [logout]
+            #
+            email_col, logout_col = st.columns(  # Chia hàng thành cột email và cột nút đăng xuất
+                [6, 1],  # Email chiếm phần lớn, nút chỉ cần chỗ cho icon
+                vertical_alignment="center",  # Căn giữa theo chiều dọc để icon thẳng hàng với chữ
             )
+
+            with email_col:
+                st.caption(
+                    f":material/account_circle: {email}"
+                )
+
+            with logout_col:
+                if st.button(
+                        ":material/logout:",  # Icon đăng xuất
+                        key="logout",  # Key cố định vì chỉ có một nút này
+                        type="tertiary",  # Nút không viền, giống nút xóa hội thoại
+                        help="Đăng xuất",  # Tooltip khi rê chuột
+                ):
+                    action.logout()  # Xóa token và toàn bộ dữ liệu phiên
+                    st.rerun()  # Vẽ lại trang, lúc này không còn user nên hiện form đăng nhập
 
         # =====================
         # New conversation
@@ -46,7 +66,6 @@ def render_sidebar(
                 title=datetime.now().strftime(
                     "%Y-%m-%d %H:%M:%S"
                 ),
-                user_id=user.user_id
             )
 
             st.rerun()

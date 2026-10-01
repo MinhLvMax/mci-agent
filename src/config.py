@@ -72,10 +72,14 @@ class Config:
 
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM')
-    JWT_EXPIRE_MINUTES = os.getenv('JWT_EXPIRE_MINUTES')
+    JWT_EXPIRE_MINUTES = int(os.getenv('JWT_EXPIRE_MINUTES', '480'))  # Ép sang int vì timedelta không nhận chuỗi, mặc định 8 tiếng
 
 
 if __name__ == '__main__':
-    print(Config.JWT_SECRET_KEY)
-    print(Config.JWT_ALGORITHM)
-    print(Config.JWT_EXPIRE_MINUTES)
+    # print(Config.JWT_SECRET_KEY)
+    # print(Config.JWT_ALGORITHM)
+    # print(Config.JWT_EXPIRE_MINUTES)
+    # import secrets
+    #
+    # print(secrets.token_urlsafe(64))
+    ...

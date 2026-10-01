@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
@@ -34,20 +36,17 @@ chat_router = APIRouter(
     path='/',
     response_model=ChatResponse
 )
-def chat(request: ChatRequest) -> ChatResponse:
+def chat(
+        request: ChatRequest,
+        user_id: int = Depends(get_current_user_id),  # User id lấy từ token, không phải client tự khai
+) -> ChatResponse:
     connection = create_postgres_connection()
     try:
-        conversation_repository = PostgreConversationsRepository(
-            connection
+        conversation = get_owned_conversation(  # Chỉ cho chat trong conversation của chính mình
+            PostgreConversationsRepository(connection),
+            conversation_id=request.conversation_id,
+            user_id=user_id,
         )
-        conversation = conversation_repository.get_by_id(
-            conversation_id=request.conversation_id
-        )
-        if conversation is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Conversation not found"
-            )
 
         workspace_service = build_workspace_service()
 

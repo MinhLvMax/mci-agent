@@ -17,6 +17,7 @@ from src.app.services.postgre_db.postgre_messages_repository import PostgreMesse
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.usecases.chat_usecase import ChatUseCase
+from src.app.services.jwt_service import JWTService
 # from src.pre.controllers.agent.agent_controller import AgentController
 from src.config import Config
 
@@ -65,6 +66,14 @@ def build_workspace_service() -> WorkspaceService:
     return WorkspaceService(
         workspace_root=Config.AGENT_ROOT_WORKSPACE
     )
+
+def build_jwt_service() -> JWTService:
+    return JWTService(
+        secret_key=Config.JWT_SECRET_KEY,  # Khóa bí mật dùng để ký và kiểm tra token
+        algorithm=Config.JWT_ALGORITHM,  # Thuật toán ký, ví dụ HS256
+        expire_minutes=Config.JWT_EXPIRE_MINUTES,  # Số phút token còn hiệu lực
+    )
+
 
 def build_agent_service(agent_workspace_dir):
     return AgentService(

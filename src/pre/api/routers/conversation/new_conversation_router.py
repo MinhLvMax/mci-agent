@@ -1,14 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.new_conversation_usecase import NewConversationUsecase, \
     NewConversationUseCaseCommand
+from src.pre.api.dependencies import get_current_user_id
 
 
 class NewConversationRequest(BaseModel):
-    title: str
-    user_id: int
+    title: str  # Bỏ user_id để client không tạo hội thoại dưới tên người khác
 
 
 class NewConversationResponse(BaseModel):
@@ -25,7 +25,10 @@ new_conversation_router = APIRouter(
     path='/',
     response_model=NewConversationResponse
 )
-def new_conversation_controller(request: NewConversationRequest) -> NewConversationResponse:
+def new_conversation_controller(
+        request: NewConversationRequest,
+        user_id: int = Depends(get_current_user_id),  # Chủ sở hữu hội thoại lấy từ token
+) -> NewConversationResponse:
     connection = create_postgres_connection()
     try:
         repository = PostgreConversationsRepository(connection)
@@ -35,7 +38,7 @@ def new_conversation_controller(request: NewConversationRequest) -> NewConversat
         result = usecase.execute(
             NewConversationUseCaseCommand(
                 title=request.title,
-                user_id=request.user_id
+                user_id=user_id  # Gắn hội thoại cho user đã xác thực
             )
         )
         return NewConversationResponse(

@@ -30,6 +30,9 @@ def render_login(
                 text_alignment="center",
             )
 
+            if state.auth_notice:  # Có lý do bị đăng xuất, ví dụ phiên hết hạn
+                st.info(state.auth_notice, icon=":material/schedule:")  # Báo cho user biết vì sao phải đăng nhập lại
+
             with st.form(
                     "login_form",
                     border=False,
@@ -61,9 +64,7 @@ def render_login(
 
             try:
                 action.signin(str(email), str(password))
-                action.list_conversations(
-                    state.user.user_id
-                )
+                action.list_conversations()  # Backend lấy user từ token vừa nhận
             except Exception as e:
                 # Không rerun ở đây, nếu không thông báo lỗi sẽ biến mất ngay.
                 st.error(str(e))

@@ -20,6 +20,29 @@ class StateManager:
 
     # ===
 
+    # JWT backend cấp khi đăng nhập, gửi kèm mọi request sau đó.
+    @property
+    def access_token(self) -> str | None:
+        return st.session_state.get("access_token")  # None nghĩa là chưa đăng nhập
+
+    @access_token.setter
+    def access_token(self, value: str | None):
+        st.session_state["access_token"] = value  # Lưu token trong phiên của user hiện tại
+
+    # Thông báo hiện ở màn hình đăng nhập, ví dụ khi phiên hết hạn.
+    @property
+    def auth_notice(self) -> str | None:
+        return st.session_state.get("auth_notice")
+
+    @auth_notice.setter
+    def auth_notice(self, value: str | None):
+        st.session_state["auth_notice"] = value
+
+    def logout(self):
+        st.session_state.clear()  # Xóa toàn bộ phiên: user, token, hội thoại, file đang mở
+
+    # ===
+
     @dataclass
     class Conversation:
         title: str

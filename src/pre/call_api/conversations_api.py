@@ -54,15 +54,9 @@ class ConversationAPI:
             delete_status=data['status']
         )
 
-    def list(
-            self,
-            user_id: str | int
-    ):
+    def list(self):
         response = self.client.post(
-            path='/list_conversation/',
-            json={
-                "user_id": user_id,
-            },
+            path='/list_conversation/',  # Không gửi user_id, backend tự lấy từ token
         )
         response.raise_for_status()
         data = response.json()
@@ -80,13 +74,11 @@ class ConversationAPI:
     def new(
             self,
             title: str,
-            user_id: int | str
     ):
         response = self.client.post(
-            path='/new_conversation',
+            path='/new_conversation/',  # Thêm "/" cuối để khớp route, tránh FastAPI redirect 307
             json={
-                'title': title,
-                "user_id": user_id,
+                'title': title,  # Không gửi user_id, backend tự lấy từ token
             },
         )
         response.raise_for_status()

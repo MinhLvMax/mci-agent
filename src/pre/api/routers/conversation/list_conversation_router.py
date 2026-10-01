@@ -1,14 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.list_conversation_usecase import \
     ListConversationUseCaseCommand, ListConversationUsecase
 from src.dom.entities.conversation import Conversation
+from src.pre.api.dependencies import get_current_user_id
 
 
-class ListConversationRequest(BaseModel):
-    user_id: int
+# Không còn request body: trước đây client gửi user_id lên nên ai cũng xem được
+# hội thoại của người khác, giờ user_id chỉ lấy từ token.
 
 
 class ListConversationResponse(BaseModel):
@@ -24,7 +25,9 @@ list_conversation_router = APIRouter(
     path='/',
     response_model=ListConversationResponse
 )
-def list_conversation_controller(request: ListConversationRequest) -> ListConversationResponse:
+def list_conversation_controller(
+        user_id: int = Depends(get_current_user_id),  # Chỉ liệt kê hội thoại của user trong token
+) -> ListConversationResponse:
     connection = create_postgres_connection()
     try:
         repository = PostgreConversationsRepository(connection)
@@ -33,7 +36,7 @@ def list_conversation_controller(request: ListConversationRequest) -> ListConver
         )
         result = usecase.execute(
             ListConversationUseCaseCommand(
-                user_id=request.user_id
+                user_id=user_id  # Dùng user id đã xác thực
             )
         )
         return ListConversationResponse(

@@ -19,9 +19,23 @@ class UIActions:
             user_id=response.id,
             email=response.email
         )
+        self.state.access_token = response.access_token  # Lưu token để các lần rerun sau dùng lại
+        self.api.client.access_token = response.access_token  # Gắn ngay vào client cho các request còn lại của lượt chạy này
+        self.state.auth_notice = None  # Đăng nhập lại thành công thì bỏ thông báo hết phiên
 
-    def list_conversations(self, user_id: int):
-        response = self.api.conversations_api.list(user_id)
+    def logout(self):
+        """
+        Đăng xuất ở phía UI.
+
+        JWT không lưu ở server nên backend không cần gọi API nào:
+        chỉ cần xóa token khỏi phiên là các request sau không còn được xác thực.
+        """
+
+        self.state.logout()  # Xóa user, token, hội thoại, file đang mở khỏi session
+        self.api.client.access_token = None  # Gỡ token khỏi client phòng khi còn request trong lượt chạy này
+
+    def list_conversations(self):
+        response = self.api.conversations_api.list()  # Backend tự biết user nào nhờ token
         # logger.debug(response.conversations)
         conversations = response.conversations
         self.state.user_conversations = [
@@ -82,17 +96,15 @@ class UIActions:
             conversation_id=self.state.current_conversation_id
         )
 
-    def create_new_conversation(self, title: str,
-                                user_id: str | int):
+    def create_new_conversation(self, title: str):
         response = self.api.conversations_api.new(
-            title=title,
-            user_id=user_id
+            title=title,  # Không cần user_id, backend lấy từ token
         )
         self.state.current_conversation_id = response.conversation_id
         self.select_conversation(conversation_id=response.conversation_id)
 
         # Để hội thoại mới hiện ngay ở sidebar.
-        self.list_conversations(user_id)
+        self.list_conversations()
 
     def delete_conversation(
             self,
@@ -119,9 +131,7 @@ class UIActions:
             self.state.work_space_items = []
             self.state.opened_file = None
 
-        self.list_conversations(
-            self.state.user.user_id
-        )
+        self.list_conversations()
 
         return True
 
