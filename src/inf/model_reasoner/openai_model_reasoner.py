@@ -1,6 +1,6 @@
 import json
 from typing import Generator
-from openai import OpenAI
+from openai import NOT_GIVEN, OpenAI
 from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
 from src.dom.decision import Decision
@@ -69,8 +69,9 @@ class OpenAIModelReasoner(ModelReasoner):
         response = self.client.responses.create(
             model=self.model,
             input=input_items,
-            tools=tool_schemas,
-            tool_choice="auto",
+            # Gọi không kèm tool (vd: tool nội bộ cần LLM trả JSON) thì không gửi tham số tools
+            tools=tool_schemas or NOT_GIVEN,
+            tool_choice="auto" if tool_schemas else NOT_GIVEN,
         )
 
         # -------------------------

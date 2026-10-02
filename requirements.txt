@@ -11,6 +11,7 @@ charset-normalizer==3.5.1
 click==8.5.0
 cryptography==50.0.1
 ddgs==9.16.0
+defusedxml==0.7.1
 distro==1.9.0
 fastapi==0.141.1
 groq==1.7.0
@@ -67,3 +68,5 @@ urllib3==2.8.0
 uvicorn==0.53.0
 watchdog==6.0.0
 websockets==16.1.1
+youtube-transcript-api==1.2.4
+yt-dlp==2026.8.19

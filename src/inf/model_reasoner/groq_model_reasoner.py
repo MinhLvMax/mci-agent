@@ -1,6 +1,6 @@
 import json
 from typing import Generator
-from groq import Groq
+from groq import NOT_GIVEN, Groq
 
 from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
@@ -41,8 +41,9 @@ class GroqModelReasoner(ModelReasoner):
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            tools=tool_schemas,
-            tool_choice="auto",
+            # Gọi không kèm tool (vd: tool nội bộ cần LLM trả JSON) thì không gửi tham số tools
+            tools=tool_schemas or NOT_GIVEN,
+            tool_choice="auto" if tool_schemas else NOT_GIVEN,
         )
 
         message = response.choices[0].message

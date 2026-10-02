@@ -1,6 +1,9 @@
+import time
 import uuid
 from typing import Generator, Literal
-from ollama import Client
+
+import httpx
+from ollama import Client, ResponseError
 
 from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
@@ -19,6 +22,8 @@ from src.config import Config
 
 class OllamaModelReasoner(ModelReasoner):
     CLOUD_HOST = "https://ollama.com"
+    MAX_ATTEMPTS = 3  # Tổng số lần gọi khi gặp lỗi tạm thời
+    RETRY_DELAY_SECONDS = 2  # Lần gọi lại thứ n chờ n * 2 giây
 
     def __init__(self,
                  host: str | None = None,
@@ -56,29 +61,43 @@ class OllamaModelReasoner(ModelReasoner):
             for tool in tools
         ]
 
-        stream = self.client.chat(
-            model=self.model,
-            messages=messages,
-            tools=tool_schemas,
-            think=self.think,
-            stream=True,
-        )
+        for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            content = ""
+            raw_tool_calls = []
 
-        content = ""
-        raw_tool_calls = []
+            try:
+                stream = self.client.chat(
+                    model=self.model,
+                    messages=messages,
+                    tools=tool_schemas,
+                    think=self.think,
+                    stream=True,
+                )
 
-        for chunk in stream:
-            message = chunk.message
+                for chunk in stream:
+                    message = chunk.message
 
-            if message.thinking:
-                yield AgentEvent(type='thinking', data={"text": message.thinking})
+                    if message.thinking:
+                        yield AgentEvent(type='thinking', data={"text": message.thinking})
 
-            if message.content:
-                content += message.content
-                yield AgentEvent(type='content', data={"text": message.content})
+                    if message.content:
+                        content += message.content
+                        yield AgentEvent(type='content', data={"text": message.content})
 
-            if message.tool_calls:
-                raw_tool_calls.extend(message.tool_calls)
+                    if message.tool_calls:
+                        raw_tool_calls.extend(message.tool_calls)
+
+                break
+
+            except (ResponseError, ConnectionError, httpx.TransportError) as e:
+                # Lỗi tạm thời của server (500, 429, mất kết nối) thì gọi lại sau một lúc.
+                # Đã trả chữ cho người dùng thì không gọi lại nữa để câu trả lời không bị lặp.
+                if content or attempt == self.MAX_ATTEMPTS or not _is_transient(e):
+                    raise
+
+                delay = self.RETRY_DELAY_SECONDS * attempt
+                Config.logger.warning(f'Ollama request failed ({e}), retry {attempt}/{self.MAX_ATTEMPTS - 1} in {delay}s')
+                time.sleep(delay)
 
         if raw_tool_calls:
             tool_calls = [
@@ -169,3 +188,10 @@ class OllamaModelReasoner(ModelReasoner):
             name=call.function.name,
             kwargs=dict(call.function.arguments or {}),
         )
+
+
+def _is_transient(error: Exception) -> bool:
+    '''Lỗi đáng gọi lại: server lỗi 5xx, quá tải 429 hoặc lỗi kết nối'''
+    if isinstance(error, ResponseError):
+        return error.status_code >= 500 or error.status_code == 429
+    return True

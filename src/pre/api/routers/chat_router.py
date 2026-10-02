@@ -14,6 +14,8 @@ from src.app.services.postgre_db.postgre_conversations_repository import (
 from src.app.services.postgre_db.postgre_files_repository import (
     PostgreFilesRepository
 )
+from src.app.services.postgre_db.postgre_skills_repository import PostgreSkillsRepository
+from src.app.services.system_prompt_builder import build_system_prompt
 from src.app.services.workspace_sync_service import WorkspaceSyncService
 
 from src.app.usecases.chat_usecase import ChatUseCase, ChatUseCaseCommand
@@ -60,10 +62,14 @@ def chat(
             conversation_id=conversation.id,
         )
 
+        # Đọc skill mỗi lượt chat để admin sửa trong DB là có hiệu lực ngay
+        skills = PostgreSkillsRepository(connection).list_active()
+
         mess_repository = PostgreMessegesRepository(connection)
         usecase = ChatUseCase(
-            agent=build_agent_service(conversation_workspace_dir),
-            conversation_repository=mess_repository
+            agent=build_agent_service(conversation_workspace_dir, skills),
+            conversation_repository=mess_repository,
+            system_prompt=build_system_prompt(skills),
         )
         try:
             result = usecase.execute(
@@ -136,9 +142,11 @@ def chat_stream(
     def event_lines():
         # Connection phải sống tới khi stream xong nên mọi thứ nằm trong generator
         try:
+            skills = PostgreSkillsRepository(connection).list_active()
             usecase = ChatUseCase(
-                agent=build_agent_service(conversation_workspace_dir),
-                conversation_repository=PostgreMessegesRepository(connection)
+                agent=build_agent_service(conversation_workspace_dir, skills),
+                conversation_repository=PostgreMessegesRepository(connection),
+                system_prompt=build_system_prompt(skills),
             )
             try:
                 for event in usecase.execute_stream(

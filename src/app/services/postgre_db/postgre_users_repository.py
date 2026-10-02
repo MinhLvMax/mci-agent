@@ -18,7 +18,8 @@ class PostgresUsersRepository:
                     id,
                     email,
                     password_hash,
-                    is_active
+                    is_active,
+                    role
                 FROM users
                 WHERE lower(email) = lower(%s)
                 """,  # So sánh không phân biệt hoa thường: "A@x.com" và "a@x.com" là một tài khoản
@@ -34,7 +35,8 @@ class PostgresUsersRepository:
             id=row[0],
             email=row[1],
             password_hash=row[2],
-            is_active=row[3]  # Trạng thái kích hoạt để đăng nhập kiểm tra
+            is_active=row[3],  # Trạng thái kích hoạt để đăng nhập kiểm tra
+            role=row[4]
         )
 
     def create(

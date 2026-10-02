@@ -25,10 +25,25 @@ class ChatUseCase:
             self,
             agent: AgentService,
             conversation_repository,
-
+            system_prompt: str | None = None,  # Dựng từ các skill admin cấu hình, None thì không gửi
     ):
         self.agent = agent
         self.conversation_repository = conversation_repository
+        self.system_prompt = system_prompt
+
+    def _build_context(self, messages: list[Message]) -> Context:
+        '''Chuyển lịch sử về dạng text agent cần, system prompt đứng đầu và không lưu vào DB'''
+        context_messages = [
+            TextMessage(
+                role=m.role,
+                content=m.content,
+            ) for m in messages
+        ]
+
+        if self.system_prompt:
+            context_messages.insert(0, TextMessage(role='system', content=self.system_prompt))
+
+        return Context(messages=context_messages)
 
     def execute(
             self,
@@ -46,14 +61,7 @@ class ChatUseCase:
 
         # Gọi agent
         response = self.agent.invoke(
-            context=Context(
-                messages=[
-                    TextMessage(  # Phải chuyển về dạng text mà agent cần
-                        role=m.role,
-                        content=m.content,
-                    ) for m in messages
-                ]
-            )
+            context=self._build_context(messages)
         )
 
         # Tạo message assistant
@@ -96,14 +104,7 @@ class ChatUseCase:
         reasoning: list[dict] = []  # [{"type": "thinking", "text"}, {"type": "tool_call", "id", "name", "kwargs", "result"}]
 
         for event in self.agent.invoke_stream(
-                context=Context(
-                    messages=[
-                        TextMessage(
-                            role=m.role,
-                            content=m.content,
-                        ) for m in messages
-                    ]
-                )
+                context=self._build_context(messages)
         ):
             if event.type == 'thinking':
                 # Các mẩu thinking liền nhau gộp thành một bước
