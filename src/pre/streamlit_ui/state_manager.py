@@ -139,6 +139,17 @@ class StateManager:
     def work_space_items(self, value: list[WorkSpaceItem]):
         st.session_state["work_space_items"] = value
 
+    # Đường dẫn các thư mục đang mở trong cây Workspace, vd {"research", "research/abc"}.
+    @property
+    def expanded_folders(self) -> set[str]:
+        if "expanded_folders" not in st.session_state:
+            st.session_state["expanded_folders"] = set()
+        return st.session_state["expanded_folders"]
+
+    @expanded_folders.setter
+    def expanded_folders(self, value: set[str]):
+        st.session_state["expanded_folders"] = value
+
     # ===
 
     @dataclass

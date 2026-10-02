@@ -57,6 +57,7 @@ class Config:
     OPEN_API_KEY = os.getenv('OPEN_API_KEY')
     OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY')
     OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+
     AGENT_ROOT_WORKSPACE = Path(os.getenv('AGENT_ROOT_WORKSPACE'))
     AGENT_ROOT_WORKSPACE.mkdir(exist_ok=True, parents=True)
 
@@ -74,7 +75,10 @@ class Config:
 
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM')
-    JWT_EXPIRE_MINUTES = int(os.getenv('JWT_EXPIRE_MINUTES', '480'))  # Ép sang int vì timedelta không nhận chuỗi, mặc định 8 tiếng
+    JWT_EXPIRE_MINUTES = int(
+        os.getenv('JWT_EXPIRE_MINUTES', '480'))  # Ép sang int vì timedelta không nhận chuỗi, mặc định 8 tiếng
+
+    API_BASE_URL = os.getenv('API_BASE_URL')
 
 
 if __name__ == '__main__':

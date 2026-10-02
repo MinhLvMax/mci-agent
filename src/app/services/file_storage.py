@@ -4,6 +4,8 @@ import json
 import mimetypes
 import re
 import shutil
+import tempfile
+import zipfile
 from typing import Any
 
 
@@ -351,6 +353,45 @@ class FileStorage:
             )
 
         return file_path
+
+    def zip_directory(
+            self,
+            path: str
+    ) -> Path:
+        """
+        Nén một thư mục trong workspace thành file zip tạm.
+
+        Giải nén ra được thư mục <tên thư mục>/... giữ nguyên cấu trúc bên trong.
+        File zip nằm ngoài workspace (thư mục tạm của hệ thống),
+        bên gọi chịu trách nhiệm xóa sau khi dùng xong.
+        """
+
+        dir_path = self._resolve_path(path)
+
+        if not dir_path.exists():
+            raise FileNotFoundError(
+                f"Directory not found: {path}"
+            )
+
+        if not dir_path.is_dir():
+            raise ValueError(
+                f"Path is not a directory: {path}"
+            )
+
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp:
+            zip_path = Path(temp.name)
+
+        try:
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for item in sorted(dir_path.rglob("*")):
+                    # Tên trong zip tính từ thư mục cha để giải nén ra đúng <tên thư mục>/...
+                    archive.write(item, arcname=item.relative_to(dir_path.parent))
+
+        except Exception:
+            zip_path.unlink(missing_ok=True)  # Nén lỗi thì không để lại file tạm
+            raise
+
+        return zip_path
 
     def get_size(
             self,

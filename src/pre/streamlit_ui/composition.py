@@ -24,9 +24,11 @@ class APIService:
         self.file_api = file_api
 
 
-def build_api_service(access_token: str | None = None):
+def build_api_service(
+        base_url: str,
+        access_token: str | None = None):
     api_client = APIClient(
-        base_url='http://127.0.0.1:8000',
+        base_url=base_url,
         access_token=access_token  # Token đã lưu trong session, None nếu chưa đăng nhập
     )
     chat_api = ChatAPI(

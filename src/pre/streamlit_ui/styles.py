@@ -35,7 +35,11 @@ _CSS = """
 .st-key-file_preview h1 { font-size: 1.5rem; padding-top: 0.25rem; }
 .st-key-file_preview h2 { font-size: 1.25rem; }
 .st-key-file_preview h3 { font-size: 1.1rem; }
-</style>
+""" + "".join(
+    # Cây thư mục Workspace: hàng ở cấp d có key "tree_d{d}_..." (xem workspace_layout.py), thụt lề theo cấp
+    f'[class*="st-key-tree_d{depth}_"] {{ padding-left: {depth * 1.1:.1f}rem; }}\n'
+    for depth in range(1, 11)
+) + """</style>
 """
 
 

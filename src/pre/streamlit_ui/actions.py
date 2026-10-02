@@ -89,6 +89,7 @@ class UIActions:
         # File đang mở thuộc conversation cũ
         # nên phải reset.
         self.state.opened_file = None
+        self.state.expanded_folders = set()  # Cây thư mục của hội thoại mới bắt đầu ở trạng thái đóng
         self.state.chat_error = None
         self.state.upload_errors = []  # Lỗi upload thuộc hội thoại cũ, không hiện ở hội thoại mới
 

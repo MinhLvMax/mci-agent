@@ -1,6 +1,9 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from src.pre.api.dependencies import get_current_user_id
 
@@ -113,10 +116,13 @@ def download_file(
         # (kể cả tên file tiếng Việt) khi truyền filename.
         return FileResponse(
             path=result.physical_path,
-            filename=result.file.name,
-            media_type=(
-                    result.file.mime_type
-                    or "application/octet-stream"
+            filename=result.download_name,
+            media_type=result.media_type,
+            # Zip tạm của thư mục: gửi xong thì xóa để không đầy thư mục tạm
+            background=(
+                BackgroundTask(os.remove, result.physical_path)
+                if result.is_temporary
+                else None
             ),
         )
 
