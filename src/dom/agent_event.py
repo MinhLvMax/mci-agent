@@ -10,9 +10,10 @@ class AgentEvent:
     - tool_call: {"id", "name", "kwargs"}
     - tool_result: {"id", "name", "result"}
     - done: {"content", "reasoning"}
+    - interrupted: {"content", "reasoning"} lượt chạy lỗi giữa chừng, đã lưu tóm tắt các bước đã làm
     - error: {"message"}
     '''
-    type: Literal['thinking', 'content', 'tool_call', 'tool_result', 'done', 'error']
+    type: Literal['thinking', 'content', 'tool_call', 'tool_result', 'done', 'interrupted', 'error']
     data: dict
 
     def to_dict(self) -> dict:

@@ -43,6 +43,7 @@ class PostgreMessegesRepository:
                     role=row[0],
                     content=row[1],
                     reasoning=metadata.get("reasoning"),
+                    interrupted=metadata.get("interrupted", False),
                 )
             )
 
@@ -90,4 +91,6 @@ class PostgreMessegesRepository:
         metadata = {}
         if message.reasoning:
             metadata["reasoning"] = message.reasoning
+        if message.interrupted:
+            metadata["interrupted"] = True
         return Jsonb(metadata) if metadata else None

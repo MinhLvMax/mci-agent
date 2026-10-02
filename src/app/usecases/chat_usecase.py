@@ -6,6 +6,7 @@ from src.app.services.postgre_db.postgre_messages_repository import PostgreMesse
 from src.dom.context import Context
 from src.dom.message.text_message import TextMessage
 from src.dom.entities.message import Message
+from src.config import Config
 
 
 @dataclass
@@ -20,6 +21,8 @@ class ChatUseCaseResult:
 
 
 class ChatUseCase:
+    SUMMARY_KWARGS_CHARS = 150  # Độ dài tối đa tham số mỗi bước trong tóm tắt khi bị gián đoạn
+    SUMMARY_RESULT_CHARS = 200  # Độ dài tối đa phần kết quả mỗi bước
 
     def __init__(
             self,
@@ -103,6 +106,28 @@ class ChatUseCase:
 
         reasoning: list[dict] = []  # [{"type": "thinking", "text"}, {"type": "tool_call", "id", "name", "kwargs", "result"}]
 
+        try:
+            yield from self._stream_and_save(command, messages, reasoning)
+
+        except Exception as e:
+            # Lỗi giữa chừng (vd model lỗi 500): vẫn lưu tin nhắn kèm tóm tắt các bước đã làm
+            # để user gõ "tiếp tục" thì agent biết làm tiếp từ đâu
+            interrupted_message = self._save_interrupted(command, reasoning, e)
+
+            if interrupted_message is not None:
+                yield AgentEvent(
+                    type='interrupted',
+                    data={"content": interrupted_message.content, "reasoning": interrupted_message.reasoning}
+                )
+
+            raise  # Router vẫn gửi event error như cũ
+
+    def _stream_and_save(
+            self,
+            command: ChatUseCaseCommand,
+            messages: list[Message],
+            reasoning: list[dict],
+    ) -> Iterator[AgentEvent]:
         for event in self.agent.invoke_stream(
                 context=self._build_context(messages)
         ):
@@ -145,3 +170,69 @@ class ChatUseCase:
                 )
 
             yield event
+
+    def _save_interrupted(
+            self,
+            command: ChatUseCaseCommand,
+            reasoning: list[dict],
+            error: Exception,
+    ) -> Message | None:
+        '''Lưu tin nhắn user và tin nhắn assistant bị gián đoạn, lỗi khi lưu thì bỏ qua để lỗi gốc vẫn được báo'''
+        assistant_message = Message(
+            role="assistant",
+            content=self._progress_summary(reasoning, error),
+            reasoning=reasoning or None,
+            interrupted=True,
+        )
+
+        try:
+            self.conversation_repository.add_message(
+                conversation_id=command.conversation_id,
+                message=command.messages
+            )
+            self.conversation_repository.add_message(
+                conversation_id=command.conversation_id,
+                message=assistant_message
+            )
+        except Exception:
+            Config.logger.exception('Failed to save interrupted messages')
+            return None
+
+        return assistant_message
+
+    def _progress_summary(self, reasoning: list[dict], error: Exception) -> str:
+        '''
+        Tóm tắt các tool đã chạy xong. Nội dung này nằm trong lịch sử hội thoại
+        nên ở lượt sau model đọc được và biết đã làm tới đâu.
+        '''
+        lines = [f"⚠️ Lượt trả lời bị gián đoạn do lỗi: {_shorten(str(error), 200)}"]
+
+        done_steps = [
+            step for step in reasoning
+            if step["type"] == 'tool_call' and step.get("result") is not None
+        ]
+
+        if done_steps:
+            lines += ["", "Các bước đã hoàn thành:"]
+            for number, step in enumerate(done_steps, 1):
+                kwargs = ", ".join(f"{k}={v}" for k, v in (step.get("kwargs") or {}).items())
+                # Gộp các dòng đầu vì thông tin quan trọng (project, source_id...) thường ở dòng 2-3
+                result = " | ".join(line.strip() for line in step["result"].splitlines() if line.strip())
+                lines.append(
+                    f"{number}. {step['name']}({_shorten(kwargs, self.SUMMARY_KWARGS_CHARS)})"
+                    f" → {_shorten(result, self.SUMMARY_RESULT_CHARS)}"
+                )
+        else:
+            lines += ["", "Chưa có bước nào hoàn thành."]
+
+        lines += [
+            "",
+            'Gõ "tiếp tục" để agent làm tiếp từ bước dang dở (không lặp lại các bước đã xong).',
+        ]
+
+        return "\n".join(lines)
+
+
+def _shorten(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit - 1] + "…"

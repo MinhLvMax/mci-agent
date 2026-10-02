@@ -128,7 +128,9 @@ class UIActions:
             if event["type"] == "error":
                 raise RuntimeError(event["data"]["message"])
 
-            if event["type"] == "done":
+            # Bị gián đoạn: backend đã lưu tóm tắt các bước đã làm, hiện luôn không cần tải lại.
+            # Event error theo sau sẽ hiện thông báo lỗi.
+            if event["type"] in ("done", "interrupted"):
                 self.state.messages_in_current_conversation.append(
                     StateManager.Message(
                         role="assistant",

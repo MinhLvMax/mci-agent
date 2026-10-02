@@ -9,4 +9,5 @@ class Message:
     # metadata: dict
     id: int | None = None # Lúc tạo mới trả về ra mới cần
     reasoning: list[dict] | None = None  # Các bước suy luận/gọi tool của assistant, chỉ để hiển thị
+    interrupted: bool = False  # Lượt trả lời bị lỗi giữa chừng, content là tóm tắt các bước đã làm
 
