@@ -1,21 +1,18 @@
 from pathlib import Path
 
-from src.inf.tools.web.ddgs_tool import DDGSTool
+from src.inf.tools.web.web_search_tool import WebSearchTool
 from src.inf.tools.web.open_url_tool import OpenURLTool
-from src.inf.tools.web.news_search_tool import NewsSearchTool
-from src.inf.tools.web.save_article_tool import SaveArticleTool
 from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
 from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
-from src.inf.tools.research.start_project_tool import StartResearchProjectTool
 from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
-from src.inf.tools.research.query_insights_tool import QueryInsightsTool
 from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
-from src.inf.tools.research.build_report_tool import BuildResearchReportTool
 from src.inf.tools.skill.load_skill_tool import LoadSkillTool
 from src.inf.tools.file.get_file_info_tool import GetFileInfoTool
 from src.inf.tools.file.list_files_tool import ListFilesTool
+from src.inf.tools.file.move_path_tool import MovePathTool
 from src.inf.tools.file.patch_file_tool import PatchFileTool
 from src.inf.tools.file.read_file_tool import ReadFileTool
+from src.inf.tools.file.rename_path_tool import RenamePathTool
 from src.inf.tools.file.search_files_tool import SearchFilesTool
 from src.inf.tools.file.write_file_tool import WriteFileTool
 
@@ -65,29 +62,27 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
     return ToolExecutor(
         tools=[
             # Web
-            DDGSTool(),
-            OpenURLTool(),
-            NewsSearchTool(),
-            SaveArticleTool(workspace_dir=agent_workspace_dir),
+            WebSearchTool(),
+            OpenURLTool(workspace_dir=agent_workspace_dir),
 
             # YouTube
             YoutubeSearchTool(),
             YoutubeTranscriptTool(workspace_dir=agent_workspace_dir),
 
-            # Research: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent
-            StartResearchProjectTool(workspace_dir=agent_workspace_dir),
+            # Phân tích: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent,
+            # đọc/ghi theo đường dẫn do agent chọn, phần đọc/ghi còn lại dùng tool file bên dưới
             ExtractInsightsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
-            QueryInsightsTool(workspace_dir=agent_workspace_dir),
             FindUniqueStoriesTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
-            BuildResearchReportTool(workspace_dir=agent_workspace_dir),
 
-            # file
+            # file (không có tool xóa: người dùng tự xóa trên giao diện)
             GetFileInfoTool(workspace_dir=agent_workspace_dir),
             ListFilesTool(workspace_dir=agent_workspace_dir),
-            PatchFileTool(workspace_dir=agent_workspace_dir),
             ReadFileTool(workspace_dir=agent_workspace_dir),
             SearchFilesTool(workspace_dir=agent_workspace_dir),
             WriteFileTool(workspace_dir=agent_workspace_dir),
+            PatchFileTool(workspace_dir=agent_workspace_dir),
+            MovePathTool(workspace_dir=agent_workspace_dir),
+            RenamePathTool(workspace_dir=agent_workspace_dir),
 
             # Skill
             *([LoadSkillTool(skills=on_demand_skills)] if on_demand_skills else []),

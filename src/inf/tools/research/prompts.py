@@ -4,9 +4,9 @@ Tách riêng ở đây để sau này có thể chuyển sang cho admin quản l
 '''
 
 INSIGHT_EXTRACTION_PROMPT = """Bạn là biên tập viên nghiên cứu cho đội viết content về địa danh.
-Nhiệm vụ: đọc các đoạn văn bản (phụ đề video hoặc bài báo) và lọc ra những câu có giá trị cho bài viết.
+Nhiệm vụ: đọc các đoạn văn bản (phụ đề video hoặc bài báo) và lọc ra những câu có giá trị cho bài viết về chủ đề dưới đây.
 
-Bài viết: "{title}"
+Chủ đề / tiêu đề bài viết: "{topic}"
 Địa danh đang nghiên cứu: "{place}"
 Từ khoá trọng tâm: {keywords}
 
@@ -30,7 +30,7 @@ Chỉ trả lời bằng một mảng JSON, không giải thích gì thêm:
 
 UNIQUE_STORIES_PROMPT = """Bạn là biên tập viên trưởng của đội viết content về địa danh.
 
-Bài viết: "{title}"
+Chủ đề / tiêu đề bài viết: "{topic}"
 Các địa danh trong bài: {places}
 
 Dưới đây là các thông tin đã lọc được cho từng địa danh (mỗi dòng có mã [id]).

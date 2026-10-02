@@ -1,7 +1,13 @@
+import re
 from dataclasses import dataclass
+from pathlib import Path
+
 from ddgs import DDGS
 from pydantic import Field
+
 from src.dom.tool import ToolKwargs, ToolResult, Tool
+from src.inf.tools.file.helper import WorkspacePathGuard, WorkspacePathError, save_text
+from src.inf.tools.research.text_utils import clean_markdown, split_sentences
 
 
 class OpenURLToolKwargs(ToolKwargs):
@@ -25,6 +31,20 @@ class OpenURLToolKwargs(ToolKwargs):
         )
     )
 
+    save_to: str | None = Field(
+        default=None,
+        description=(
+            "Optional workspace path to save the full page text instead of returning it, "
+            "e.g. 'ha-long/sources/wikipedia.md'. Missing folders are created, an existing file is replaced. "
+            "Only a short summary is returned, so long articles do not fill the conversation."
+        )
+    )
+
+    title: str | None = Field(
+        default=None,
+        description="Page title (from the search results), written at the top of the saved file."
+    )
+
 
 @dataclass
 class OpenURLToolResult(ToolResult):
@@ -39,13 +59,19 @@ class OpenURLTool(Tool):
 
     tool_description = (
         "Open a webpage from a URL and extract its readable text content. "
-        "Use this tool when you already have a URL, usually from search results, "
-        "and need to read the actual webpage content. "
-        "Long pages are returned in parts, use offset to read further. "
-        "To keep an article for research, use save_article instead."
+        "Use this tool when you already have a URL, usually from search results. "
+        "Without save_to it returns the text (long pages in parts, use offset to read further). "
+        "With save_to it saves the full text into a workspace file for later use (read_file, search_files, "
+        "extract_insights) and returns only a short summary."
     )
 
     tool_kwargs = OpenURLToolKwargs
+
+    PREVIEW_CHARS = 300
+    MIN_SAVE_CHARS = 200  # Ít hơn mức này thường là trang lỗi, paywall hoặc chặn bot
+
+    def __init__(self, workspace_dir: str | Path):
+        self.path_guard = WorkspacePathGuard(workspace_dir)
 
     def execute(self, **kwargs) -> ToolResult:
         args = self.tool_kwargs(**kwargs)
@@ -55,57 +81,89 @@ class OpenURLTool(Tool):
                 args.url,
                 fmt="text_markdown",
             )
-
-            if not result:
-                return OpenURLToolResult(
-                    content="Failed to extract webpage content."
-                )
-
-            content = result.get("content", "")
-
-            if not content:
-                return OpenURLToolResult(
-                    content="Webpage opened, but no readable content was found."
-                )
-
-            total = len(content)
-
-            if args.offset >= total:
-                return OpenURLToolResult(
-                    content=f"Offset {args.offset} exceeds content length ({total} chars)."
-                )
-
-            end = min(args.offset + args.max_chars, total)
-            part = content[args.offset:end]
-
-            if args.offset == 0 and end == total:
-                return OpenURLToolResult(
-                    content=part
-                )
-
-            # Trang dài: báo rõ đang đọc đoạn nào và còn tiếp hay không
-            footer = (
-                f"\n\n[Showing chars {args.offset}-{end} of {total}. "
-                f"Call again with offset={end} to read more.]"
-                if end < total
-                else f"\n\n[Showing chars {args.offset}-{end} of {total}. End of page.]"
-            )
-
-            return OpenURLToolResult(
-                content=part + footer
-            )
-
         except Exception as e:
             return OpenURLToolResult(
                 content=f"Failed to open URL: {e}"
             )
 
+        content = (result or {}).get("content", "")
+
+        if not content:
+            return OpenURLToolResult(
+                content="Webpage opened, but no readable content was found."
+            )
+
+        if args.save_to:
+            return self._save(args, content)
+
+        total = len(content)
+
+        if args.offset >= total:
+            return OpenURLToolResult(
+                content=f"Offset {args.offset} exceeds content length ({total} chars)."
+            )
+
+        end = min(args.offset + args.max_chars, total)
+        part = content[args.offset:end]
+
+        if args.offset == 0 and end == total:
+            return OpenURLToolResult(
+                content=part
+            )
+
+        # Trang dài: báo rõ đang đọc đoạn nào và còn tiếp hay không
+        footer = (
+            f"\n\n[Showing chars {args.offset}-{end} of {total}. "
+            f"Call again with offset={end} to read more.]"
+            if end < total
+            else f"\n\n[Showing chars {args.offset}-{end} of {total}. End of page.]"
+        )
+
+        return OpenURLToolResult(
+            content=part + footer
+        )
+
+    def _save(self, args: OpenURLToolKwargs, content: str) -> ToolResult:
+        '''Lưu toàn văn (đã bỏ link, ảnh, chú thích) vào workspace, chỉ trả tóm tắt'''
+        text = re.sub(r'\n{3,}', '\n\n', clean_markdown(content)).strip()
+
+        if len(text) < self.MIN_SAVE_CHARS:
+            return OpenURLToolResult(
+                content="The page has no readable article content (maybe blocked or paywalled). Try another URL."
+            )
+
+        title = args.title or args.url
+
+        try:
+            saved_path = save_text(
+                self.path_guard,
+                args.save_to,
+                f"# {title}\nURL: {args.url}\n\n{text}\n",
+            )
+        except WorkspacePathError as e:
+            return OpenURLToolResult(content=f"Cannot save to '{args.save_to}': {e}")
+
+        # Preview lấy từ các câu văn thật, bỏ qua menu/điều hướng ở đầu trang
+        sentences = split_sentences(text)
+        prose = [s for s in sentences if len(s.text) >= 60 and s.text[-1] in '.!?…"”']
+        preview = ' '.join(s.text for s in (prose or sentences)[:3])[:self.PREVIEW_CHARS]
+
+        return OpenURLToolResult(
+            content=(
+                f"Saved '{title}' to {saved_path}\n"
+                f"length: {len(text):,} chars, sentences: {len(sentences)}\n"
+                f"preview: {preview}..."
+            )
+        )
+
 
 if __name__ == "__main__":
-    tool = OpenURLTool()
+    import tempfile
 
-    result = tool.execute(
-        url="https://www.accuweather.com/vi/vn/hanoi/353412/hourly-weather-forecast/353412"
-    )
-
-    print(result.to_text())
+    with tempfile.TemporaryDirectory() as workspace:
+        tool = OpenURLTool(workspace_dir=workspace)
+        print(tool.execute(
+            url="https://vi.wikipedia.org/wiki/V%E1%BB%8Bnh_H%E1%BA%A1_Long",
+            save_to="ha-long/sources/wikipedia.md",
+            title="Vịnh Hạ Long – Wikipedia",
+        ).to_text())

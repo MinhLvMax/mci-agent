@@ -191,7 +191,7 @@ class OllamaModelReasoner(ModelReasoner):
 
 
 def _is_transient(error: Exception) -> bool:
-    '''Lỗi đáng gọi lại: server lỗi 5xx, quá tải 429 hoặc lỗi kết nối'''
+    '''Lỗi đáng gọi lại: server lỗi 5xx, quá tải 429, lỗi gửi giữa luồng stream (status -1) hoặc lỗi kết nối'''
     if isinstance(error, ResponseError):
-        return error.status_code >= 500 or error.status_code == 429
+        return error.status_code >= 500 or error.status_code in (429, -1)
     return True

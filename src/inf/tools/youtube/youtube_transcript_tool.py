@@ -7,31 +7,21 @@ from pydantic import Field
 from youtube_transcript_api import YouTubeTranscriptApi, YouTubeTranscriptApiException
 
 from src.dom.tool import Tool, ToolKwargs, ToolResult
-from src.inf.tools.research.project_store import ResearchProjectStore, ResearchProjectError
-from src.inf.tools.research.text_utils import (
-    format_timestamp,
-    parse_transcript,
-    place_terms,
-    relevance_filter,
-    mentions,
-)
+from src.inf.tools.file.helper import WorkspacePathGuard, WorkspacePathError, save_text
+from src.inf.tools.research.text_utils import to_srt
 
 
 class YoutubeTranscriptToolKwargs(ToolKwargs):
-    project: str | None = Field(
-        default=None,
-        description=(
-            "Research project slug returned by start_research_project. "
-            "Can be omitted when the workspace has only one research project."
-        )
-    )
-
-    place: str = Field(
-        description="The place (địa danh) of the project that this video is about."
-    )
-
     video_id: str = Field(
         description="YouTube video id (e.g. 'xdjTOWBowrA') or full video URL."
+    )
+
+    save_to: str | None = Field(
+        default=None,
+        description=(
+            "Workspace path of the .srt file to write, e.g. 'ha-long/subtitles/xdjTOWBowrA.srt'. "
+            "Defaults to 'transcripts/<video_id>.srt'. Missing folders are created, an existing file is replaced."
+        )
     )
 
     languages: list[str] = Field(
@@ -50,7 +40,7 @@ class YoutubeTranscriptToolResult(ToolResult):
 
 @dataclass
 class _Transcript:
-    lines: list[tuple[float, str]]  # (giây bắt đầu, câu)
+    lines: list[tuple[float, float, str]]  # (giây bắt đầu, thời lượng, câu)
     language: str
     is_generated: bool
 
@@ -58,27 +48,20 @@ class _Transcript:
 class YoutubeTranscriptTool(Tool):
     tool_name = 'youtube_transcript'
     tool_description = (
-        "Download the subtitles of a YouTube video, convert them into a timestamped transcript and save it "
-        "into the research project (research/<project>/raw/youtube/<video_id>.md) as a source of the given place. "
-        "Returns only a short summary (not the full transcript) with how many passages mention the place. "
-        "Run extract_insights afterwards to filter useful information from the saved transcripts."
+        "Download the subtitles of a YouTube video and save them as a standard .srt file in the workspace. "
+        "Returns only a short summary (title, channel, language, number of lines, file path), not the subtitles. "
+        "Use extract_insights or read_file on the saved file afterwards. "
+        "It may fail on servers whose IP is blocked by YouTube; then ask the user to upload the subtitles instead."
     )
 
     tool_kwargs = YoutubeTranscriptToolKwargs
 
     def __init__(self, workspace_dir: str | Path):
-        self.store = ResearchProjectStore(workspace_dir)
+        self.path_guard = WorkspacePathGuard(workspace_dir)
 
     def execute(self, **kwargs) -> ToolResult:
         args = self.tool_kwargs(**kwargs)
         video_id = _parse_video_id(args.video_id)
-
-        try:
-            project = self.store.load_project(args.project)
-            place = self.store.find_place(project, args.place)
-        except ResearchProjectError as e:
-            return YoutubeTranscriptToolResult(content=str(e))
-
         metadata = _fetch_metadata(video_id)
 
         try:
@@ -88,7 +71,10 @@ class YoutubeTranscriptTool(Tool):
             transcript = _fetch_with_ytdlp(metadata, args.languages)
             if transcript is None:
                 return YoutubeTranscriptToolResult(
-                    content=f"No subtitles available for video {video_id}: {type(e).__name__}. Skip this video."
+                    content=(
+                        f"No subtitles available for video {video_id}: {type(e).__name__}. "
+                        f"Skip this video or ask the user to upload its subtitles."
+                    )
                 )
 
         if not transcript.lines:
@@ -96,56 +82,22 @@ class YoutubeTranscriptTool(Tool):
                 content=f"Subtitles of video {video_id} are empty. Skip this video."
             )
 
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        title = metadata.get('title') or video_id
-        body = "\n".join(
-            f"[{format_timestamp(start)}] {text}"
-            for start, text in transcript.lines
-        )
-
-        file_path = self.store.write_raw(
-            project['slug'],
-            kind='youtube',
-            name=video_id,
-            content=(
-                f"# {title}\n"
-                f"URL: {url}\n"
-                f"Channel: {metadata.get('channel') or '?'} | Views: {metadata.get('view_count') or '?'} | "
-                f"Language: {transcript.language}{' (auto)' if transcript.is_generated else ''}\n"
-                f"---\n"
-                f"{body}\n"
+        try:
+            saved_path = save_text(
+                self.path_guard,
+                args.save_to or f"transcripts/{video_id}.srt",
+                to_srt(transcript.lines),
             )
-        )
-
-        source_id = self.store.youtube_id(video_id)
-        is_new = self.store.upsert_source(project['slug'], {
-            'id': source_id,
-            'type': 'youtube',
-            'place': place,
-            'url': url,
-            'title': title,
-            'channel': metadata.get('channel'),
-            'views': metadata.get('view_count'),
-            'published': metadata.get('upload_date'),
-            'language': transcript.language,
-            'file': file_path,
-            'extracted': False,  # extract_insights sẽ đánh dấu True sau khi lọc
-        })
-
-        passages = parse_transcript(body)
-        relevant = relevance_filter(passages, place_terms(place), window=0)
-        whole_video = mentions(title, place_terms(place))
+        except WorkspacePathError as e:
+            return YoutubeTranscriptToolResult(content=f"Cannot save to '{args.save_to}': {e}")
 
         return YoutubeTranscriptToolResult(
             content=(
-                f"{'Saved' if is_new else 'Updated'} transcript of '{title}'.\n"
-                f"source_id: {source_id}\n"
-                f"file: {file_path}\n"
-                f"language: {transcript.language}{' (auto-generated)' if transcript.is_generated else ''}\n"
-                f"lines: {len(transcript.lines)}, passages: {len(passages)}, "
-                f"passages mentioning '{place}': {len(relevant)}"
-                + ("" if whole_video else
-                   f"\nNote: the video title does not mention '{place}', only passages near a mention will be used.")
+                f"Saved subtitles of '{metadata.get('title') or video_id}' to {saved_path}\n"
+                f"URL: https://www.youtube.com/watch?v={video_id}\n"
+                f"channel: {metadata.get('channel') or '?'} | views: {metadata.get('view_count') or '?'}\n"
+                f"language: {transcript.language}{' (auto-generated)' if transcript.is_generated else ''}, "
+                f"lines: {len(transcript.lines)}"
             )
         )
 
@@ -186,7 +138,10 @@ def _fetch_with_transcript_api(video_id: str, languages: list[str]) -> _Transcri
     fetched = transcript.fetch()
 
     return _Transcript(
-        lines=[(s.start, s.text.replace('\n', ' ').strip()) for s in fetched.snippets if s.text.strip()],
+        lines=[
+            (s.start, s.duration, s.text.replace('\n', ' ').strip())
+            for s in fetched.snippets if s.text.strip()
+        ],
         language=transcript.language_code,
         is_generated=transcript.is_generated,
     )
@@ -212,7 +167,7 @@ def _fetch_with_ytdlp(metadata: dict, languages: list[str]) -> _Transcript | Non
             for event in data.get('events', []):
                 text = ''.join(seg.get('utf8', '') for seg in event.get('segs') or []).replace('\n', ' ').strip()
                 if text:
-                    lines.append((event.get('tStartMs', 0) / 1000, text))
+                    lines.append((event.get('tStartMs', 0) / 1000, event.get('dDurationMs', 0) / 1000, text))
 
             return _Transcript(lines=lines, language=language, is_generated=is_generated)
 
@@ -221,9 +176,7 @@ def _fetch_with_ytdlp(metadata: dict, languages: list[str]) -> _Transcript | Non
 
 if __name__ == '__main__':
     import tempfile
-    from src.inf.tools.research.start_project_tool import StartResearchProjectTool
 
     with tempfile.TemporaryDirectory() as workspace:
-        StartResearchProjectTool(workspace).execute(title='Test', places=['Vịnh Hạ Long'])
         tool = YoutubeTranscriptTool(workspace_dir=workspace)
-        print(tool.execute(project='test', place='Vịnh Hạ Long', video_id='xdjTOWBowrA').to_text())
+        print(tool.execute(video_id='xdjTOWBowrA').to_text())

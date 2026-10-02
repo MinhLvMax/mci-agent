@@ -8,22 +8,30 @@ from pydantic import Field
 from src.dom.tool import Tool, ToolKwargs, ToolResult
 
 
-class NewsSearchToolKwargs(ToolKwargs):
+class WebSearchToolKwargs(ToolKwargs):
     query: str = Field(
         min_length=1,
-        description="Search query, usually the place name plus a topic, e.g. 'Tràng An lịch sử'."
+        description="The search query, e.g. 'Tràng An lịch sử'."
+    )
+
+    kind: Literal['web', 'news', 'both'] = Field(
+        default='web',
+        description=(
+            "'web' for regular pages (encyclopedias, blogs, travel guides), "
+            "'news' for news articles with source and date, 'both' to combine them without duplicates."
+        )
     )
 
     max_results: int = Field(
-        default=10,
+        default=8,
         ge=1,
         le=30,
-        description="Maximum number of results from each source (news and web)."
+        description="Maximum number of results from each kind."
     )
 
     timelimit: Literal['d', 'w', 'm', 'y'] | None = Field(
         default=None,
-        description="Only return results from the last day (d), week (w), month (m) or year (y). Omit for any time."
+        description="Only results from the last day (d), week (w), month (m) or year (y). Omit for any time."
     )
 
     region: str = Field(
@@ -31,54 +39,50 @@ class NewsSearchToolKwargs(ToolKwargs):
         description="Search region, e.g. 'vn-vi' for Vietnamese results, 'wt-wt' for worldwide."
     )
 
-    include_web: bool = Field(
-        default=True,
-        description="Also include regular web results (blogs, encyclopedias, travel guides), not only news."
-    )
-
 
 @dataclass
-class NewsSearchToolResult(ToolResult):
+class WebSearchToolResult(ToolResult):
     content: str
 
     def to_text(self) -> str:
         return self.content
 
 
-class NewsSearchTool(Tool):
-    tool_name = 'news_search'
+class WebSearchTool(Tool):
+    tool_name = 'web_search'
     tool_description = (
-        "Search news articles (and optionally web pages) about a place or topic. "
-        "Returns title, source, date, snippet and URL of each article, without duplicates. "
-        "Use save_article with a URL to store a relevant article into the research project."
+        "Search the web (DuckDuckGo) for pages and/or news articles. "
+        "Returns title, source, date, snippet and URL of each result. "
+        "Use open_url to read a result, with save_to to keep its full text in the workspace."
     )
 
-    tool_kwargs = NewsSearchToolKwargs
+    tool_kwargs = WebSearchToolKwargs
 
     def execute(self, **kwargs) -> ToolResult:
         args = self.tool_kwargs(**kwargs)
         results: list[dict] = []
         errors: list[str] = []
 
-        try:
-            for item in DDGS().news(
-                    args.query,
-                    region=args.region,
-                    timelimit=args.timelimit,
-                    max_results=args.max_results,
-            ) or []:
-                results.append({
-                    'kind': 'news',
-                    'title': item.get('title', ''),
-                    'url': item.get('url', ''),
-                    'body': item.get('body', ''),
-                    'date': item.get('date', ''),
-                    'source': item.get('source', ''),
-                })
-        except DDGSException as e:
-            errors.append(f"news search failed: {e}")
+        if args.kind in ('news', 'both'):
+            try:
+                for item in DDGS().news(
+                        args.query,
+                        region=args.region,
+                        timelimit=args.timelimit,
+                        max_results=args.max_results,
+                ) or []:
+                    results.append({
+                        'kind': 'news',
+                        'title': item.get('title', ''),
+                        'url': item.get('url', ''),
+                        'body': item.get('body', ''),
+                        'date': item.get('date', ''),
+                        'source': item.get('source', ''),
+                    })
+            except DDGSException as e:
+                errors.append(f"news search failed: {e}")
 
-        if args.include_web:
+        if args.kind in ('web', 'both'):
             try:
                 for item in DDGS().text(
                         args.query,
@@ -97,6 +101,7 @@ class NewsSearchTool(Tool):
             except DDGSException as e:
                 errors.append(f"web search failed: {e}")
 
+        # Cùng một trang có thể xuất hiện ở cả tin tức lẫn web
         seen: set[str] = set()
         unique = []
         for item in results:
@@ -106,7 +111,7 @@ class NewsSearchTool(Tool):
                 unique.append(item)
 
         if not unique:
-            return NewsSearchToolResult(
+            return WebSearchToolResult(
                 content="No results found." + (f" ({'; '.join(errors)})" if errors else "")
             )
 
@@ -122,11 +127,11 @@ class NewsSearchTool(Tool):
         if errors:
             output.append(f"Warnings: {'; '.join(errors)}")
 
-        return NewsSearchToolResult(
+        return WebSearchToolResult(
             content="\n\n".join(output)
         )
 
 
 if __name__ == '__main__':
-    tool = NewsSearchTool()
-    print(tool.execute(query='Tràng An Ninh Bình', max_results=5).to_text())
+    tool = WebSearchTool()
+    print(tool.execute(query='Tràng An Ninh Bình', kind='both', max_results=3).to_text())

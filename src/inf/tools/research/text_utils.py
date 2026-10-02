@@ -70,24 +70,20 @@ def split_sentences(text: str) -> list[TextUnit]:
 _TRANSCRIPT_LINE = re.compile(r'^\[(\d+(?::\d+){1,2})\]\s*(.*)$')
 
 
-def parse_transcript(text: str, passage_chars: int = 300) -> list[TextUnit]:
+def group_passages(lines: list[tuple[int, str]], passage_chars: int = 300) -> list[TextUnit]:
     '''
-    Đọc phụ đề dạng "[mm:ss] câu" và gộp các dòng liền nhau thành đoạn khoảng passage_chars ký tự.
+    Gộp các dòng phụ đề (giây bắt đầu, chữ) liền nhau thành đoạn khoảng passage_chars ký tự.
     Phụ đề tự động không có dấu câu nên gộp theo độ dài, giữ timestamp của dòng đầu đoạn.
     '''
     units: list[TextUnit] = []
     buffer: list[str] = []
     buffer_start: int | None = None
 
-    for line in text.splitlines():
-        match = _TRANSCRIPT_LINE.match(line.strip())
-        if not match:
-            continue
-
+    for start, text in lines:
         if buffer_start is None:
-            buffer_start = parse_timestamp(match.group(1))
+            buffer_start = start
 
-        buffer.append(match.group(2).strip())
+        buffer.append(text)
 
         if sum(len(part) + 1 for part in buffer) >= passage_chars:
             units.append(TextUnit(text=' '.join(buffer), start=buffer_start))
@@ -97,6 +93,85 @@ def parse_transcript(text: str, passage_chars: int = 300) -> list[TextUnit]:
         units.append(TextUnit(text=' '.join(buffer), start=buffer_start))
 
     return units
+
+
+def parse_transcript(text: str, passage_chars: int = 300) -> list[TextUnit]:
+    '''Đọc phụ đề dạng "[mm:ss] câu" (định dạng cũ của youtube_transcript)'''
+    lines = []
+
+    for line in text.splitlines():
+        match = _TRANSCRIPT_LINE.match(line.strip())
+        if match:
+            lines.append((parse_timestamp(match.group(1)), match.group(2).strip()))
+
+    return group_passages(lines, passage_chars)
+
+
+# 00:01:02,345 --> 00:01:04,000 (srt) hoặc 01:02.345 --> ... (vtt, giờ có thể bỏ)
+_CUE_TIME = re.compile(r'^((?:\d+:)?\d{1,2}:\d{2})[.,]\d{1,3}\s*-->')
+_CUE_TAG = re.compile(r'<[^>]+>')  # Thẻ định dạng/timestamp từng chữ trong vtt: <c>, <00:00:01.000>
+
+
+def parse_subtitles(text: str, passage_chars: int = 300) -> list[TextUnit]:
+    '''
+    Đọc phụ đề .srt hoặc .vtt (kể cả phụ đề tự động của YouTube).
+    Bỏ số thứ tự, dòng thời gian, thẻ định dạng và các dòng lặp lại liên tiếp
+    (vtt tự động hay lặp lại dòng trước khi chữ chạy).
+    '''
+    lines: list[tuple[int, str]] = []
+    current_start: int | None = None
+    previous_text = ''
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+
+        match = _CUE_TIME.match(line)
+        if match:
+            current_start = parse_timestamp(match.group(1))
+            continue
+
+        if current_start is None or not line or line.isdigit():
+            continue  # Header WEBVTT, ghi chú, số thứ tự cue
+
+        cleaned = _CUE_TAG.sub('', line).strip()
+        if cleaned and cleaned != previous_text:
+            lines.append((current_start, cleaned))
+            previous_text = cleaned
+
+    return group_passages(lines, passage_chars)
+
+
+def to_srt(lines: list[tuple[float, float, str]]) -> str:
+    '''Ghi phụ đề chuẩn .srt từ danh sách (giây bắt đầu, thời lượng, chữ)'''
+
+    def stamp(seconds: float) -> str:
+        millis = int(round(seconds * 1000))
+        hours, rest = divmod(millis, 3_600_000)
+        minutes, rest = divmod(rest, 60_000)
+        secs, millis = divmod(rest, 1000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+    blocks = [
+        f"{number}\n{stamp(start)} --> {stamp(start + duration)}\n{text}\n"
+        for number, (start, duration, text) in enumerate(lines, 1)
+    ]
+    return "\n".join(blocks)
+
+
+def load_units(text: str, suffix: str) -> list[TextUnit]:
+    '''Chọn cách đọc theo loại file: phụ đề giữ timestamp, còn lại tách câu'''
+    suffix = suffix.lower()
+
+    if suffix in ('.srt', '.vtt'):
+        return parse_subtitles(text)
+
+    # File .md cũ dạng "[mm:ss] câu": phần lớn các dòng phải có timestamp, tránh nhận nhầm bài báo
+    non_empty = [line for line in text.splitlines() if line.strip()]
+    stamped = sum(1 for line in non_empty if _TRANSCRIPT_LINE.match(line.strip()))
+    if non_empty and stamped >= len(non_empty) / 2:
+        return parse_transcript(text)
+
+    return split_sentences(text)
 
 
 # Các từ chỉ loại địa danh, bỏ đi để có thêm tên gọi ngắn: "Vịnh Hạ Long" -> "Hạ Long"

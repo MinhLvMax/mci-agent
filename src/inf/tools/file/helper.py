@@ -1,3 +1,4 @@
+import shutil  # Dùng để di chuyển file/thư mục
 from pathlib import Path  # Import Path để xử lý đường dẫn file và thư mục
 
 
@@ -81,3 +82,55 @@ class WorkspacePathGuard:  # Class chịu trách nhiệm kiểm soát và giới
             raise WorkspacePathError(
                 "Path is outside workspace"
             )
+
+
+def save_text(guard: WorkspacePathGuard, relative_path: str, content: str) -> str:
+    """
+    Ghi nội dung text UTF-8 vào file trong workspace, tự tạo thư mục cha.
+    Dùng chung cho các tool có tham số save_to (open_url, youtube_transcript...).
+    Trả về relative path dạng "a/b.md".
+    """
+
+    path = guard.resolve(relative_path)
+
+    if path.exists() and path.is_dir():
+        raise WorkspacePathError(f"Path is a directory: {relative_path}")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+    return guard.to_relative(path).replace("\\", "/")
+
+
+def safe_move(guard: WorkspacePathGuard, source: str, destination: str) -> tuple[str, str]:
+    """
+    Chuyển file hoặc thư mục trong workspace, dùng chung cho move_path và rename_path.
+
+    Không bao giờ ghi đè hay xóa dữ liệu: đích đã tồn tại thì từ chối.
+    Trả về (relative path nguồn, relative path đích).
+    """
+
+    source_path = guard.resolve(source)
+    destination_path = guard.resolve(destination)
+
+    if source_path == guard.workspace_dir:
+        raise WorkspacePathError("Cannot move the workspace root.")
+
+    if not source_path.exists():
+        raise WorkspacePathError(f"Source does not exist: {source}")
+
+    if destination_path.exists():
+        raise WorkspacePathError(
+            f"Destination already exists: {destination}. Choose another path (existing files are never overwritten)."
+        )
+
+    if source_path.is_dir() and destination_path.is_relative_to(source_path):
+        raise WorkspacePathError("Cannot move a directory into itself.")
+
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source_path), str(destination_path))
+
+    return (
+        guard.to_relative(source_path).replace("\\", "/"),
+        guard.to_relative(destination_path).replace("\\", "/"),
+    )
