@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
@@ -62,11 +60,7 @@ def render_sidebar(
                 width="stretch",
                 type="primary"
         ):
-            action.create_new_conversation(
-                title=datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-            )
+            action.create_new_conversation()  # Tên tạm, AI đặt tên sau tin nhắn đầu tiên
 
             st.rerun()
 
@@ -100,9 +94,9 @@ def render_sidebar(
 
                     # Một hàng gồm:
                     #
-                    # [conversation title....] [delete]
+                    # [conversation title....] [⋮ đổi tên / xóa]
                     #
-                    title_col, delete_col = st.columns(
+                    title_col, menu_col = st.columns(
                         [6, 1],
                         vertical_alignment="center",
                     )
@@ -124,18 +118,88 @@ def render_sidebar(
 
                             st.rerun()
 
-                    with delete_col:
+                    with menu_col:
 
-                        if st.button(
-                                ":material/delete:",
-                                key=f"delete_conversation_{conversation.id}",
+                        with st.popover(
+                                ":material/more_vert:",
                                 type="tertiary",
-                                help="Xóa hội thoại",
+                                help="Tùy chọn",
                         ):
-                            confirm_delete_conversation_dialog(
-                                action,
-                                conversation,
-                            )
+                            if st.button(
+                                    "Đổi tên",
+                                    key=f"rename_conversation_{conversation.id}",
+                                    icon=":material/edit:",
+                                    type="tertiary",
+                            ):
+                                rename_conversation_dialog(
+                                    action,
+                                    conversation,
+                                )
+
+                            if st.button(
+                                    "Xóa",
+                                    key=f"delete_conversation_{conversation.id}",
+                                    icon=":material/delete:",
+                                    type="tertiary",
+                            ):
+                                confirm_delete_conversation_dialog(
+                                    action,
+                                    conversation,
+                                )
+
+
+@st.dialog("Đổi tên hội thoại", icon=":material/edit:")
+def rename_conversation_dialog(
+        action: UIActions,
+        conversation: StateManager.Conversation,
+):
+    """
+    Dùng chung cho mục "Đổi tên" ở sidebar và nút bút chì trên header.
+    """
+
+    # Form để nhấn Enter trong ô nhập là lưu luôn
+    with st.form(
+            key=f"rename_form_{conversation.id}",
+            border=False,
+    ):
+        title = st.text_input(
+            "Tên hội thoại",
+            value=conversation.title,
+            max_chars=100,  # Khớp giới hạn của backend
+        )
+
+        cancel_col, save_col = st.columns(2)
+
+        with cancel_col:
+            cancelled = st.form_submit_button(
+                "Hủy",
+                width="stretch",
+            )
+
+        with save_col:
+            saved = st.form_submit_button(
+                "Lưu",
+                type="primary",
+                width="stretch",
+            )
+
+    if cancelled:
+        st.rerun()
+
+    if saved:
+        title = title.strip()
+
+        if not title:
+            st.warning("Tên hội thoại không được để trống.", icon=":material/warning:")
+            return
+
+        if title != conversation.title:  # Không đổi gì thì khỏi gọi API
+            action.rename_conversation(
+                conversation_id=conversation.id,
+                title=title,
+            )
+
+        st.rerun()
 
 
 @st.dialog("Xóa hội thoại", icon=":material/delete:")

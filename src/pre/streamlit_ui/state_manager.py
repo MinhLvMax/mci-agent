@@ -174,6 +174,17 @@ class StateManager:
 
     # ===
 
+    # Panel đang phóng to toàn chiều ngang, None là hiện cả hai.
+    @property
+    def maximized_panel(self) -> Literal["chat", "workspace"] | None:
+        return st.session_state.get("maximized_panel")
+
+    @maximized_panel.setter
+    def maximized_panel(self, value: Literal["chat", "workspace"] | None):
+        st.session_state["maximized_panel"] = value
+
+    # ===
+
     # Số đếm gắn vào key của st.file_uploader.
     # Đổi key sau mỗi lần upload thì Streamlit tạo widget mới, ô chọn file trống trở lại.
     @property

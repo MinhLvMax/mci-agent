@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Iterator
 from src.app.services.agent_service import AgentService
 from src.dom.agent_event import AgentEvent
-from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 from src.dom.context import Context
 from src.dom.message.text_message import TextMessage
 from src.dom.entities.message import Message
@@ -104,7 +103,8 @@ class ChatUseCase:
             command.messages
         ]
 
-        reasoning: list[dict] = []  # [{"type": "thinking", "text"}, {"type": "tool_call", "id", "name", "kwargs", "result"}]
+        reasoning: list[
+            dict] = []  # [{"type": "thinking", "text"}, {"type": "tool_call", "id", "name", "kwargs", "result"}]
 
         try:
             yield from self._stream_and_save(command, messages, reasoning)

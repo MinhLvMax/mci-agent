@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, StringConstraints
 from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.update_conversation_usecase import UpdateConversationUsecase, \
@@ -9,7 +11,8 @@ from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
 class UpdateConversationRequest(BaseModel):
     conversation_id: int
-    title: str
+    # Bỏ khoảng trắng hai đầu trước khi kiểm tra, tên toàn dấu cách bị từ chối (422)
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
 
 class UpdateConversationResponse(BaseModel):

@@ -73,13 +73,13 @@ class ConversationAPI:
 
     def new(
             self,
-            title: str,
+            title: str | None = None,
     ):
         response = self.client.post(
             path='/new_conversation/',  # Thêm "/" cuối để khớp route, tránh FastAPI redirect 307
-            json={
-                'title': title,  # Không gửi user_id, backend tự lấy từ token
-            },
+            # Không gửi user_id, backend tự lấy từ token.
+            # Không có title thì backend dùng tên tạm, AI đặt tên sau tin nhắn đầu.
+            json={'title': title} if title else {},
         )
         response.raise_for_status()
         data = response.json()
@@ -94,11 +94,16 @@ class ConversationAPI:
             title: str
     ):
         response = self.client.post(
-            path='/update_conversation',
+            path='/update_conversation/',  # Thêm "/" cuối để khớp route, tránh FastAPI redirect 307
             json={
                 'conversation_id': conversation_id,
                 "title": title,
             },
         )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return UpdateConversationAPIResponse(
+            id=data['id'],
+            user_id=data['user_id'],
+            title=data['title']
+        )

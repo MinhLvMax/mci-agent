@@ -4,11 +4,14 @@ from src.app.services.postgre_db import create_postgres_connection
 from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.new_conversation_usecase import NewConversationUsecase, \
     NewConversationUseCaseCommand
+from src.app.usecases.conversation_management_usecases.generate_title_usecase import DEFAULT_CONVERSATION_TITLE
 from src.pre.api.dependencies import get_current_user_id
 
 
 class NewConversationRequest(BaseModel):
-    title: str  # Bỏ user_id để client không tạo hội thoại dưới tên người khác
+    # Bỏ user_id để client không tạo hội thoại dưới tên người khác.
+    # Không gửi title thì dùng tên tạm, AI đặt tên thật sau lượt chat đầu tiên.
+    title: str = DEFAULT_CONVERSATION_TITLE
 
 
 class NewConversationResponse(BaseModel):

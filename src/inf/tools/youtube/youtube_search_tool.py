@@ -6,7 +6,6 @@ import yt_dlp
 from pydantic import Field
 
 from src.dom.tool import Tool, ToolKwargs, ToolResult
-from src.inf.tools.research.text_utils import format_timestamp
 
 
 class YoutubeSearchToolKwargs(ToolKwargs):
@@ -97,7 +96,7 @@ class YoutubeSearchTool(Tool):
             output.append(
                 f"{i}. {video.get('title', '')}\n"
                 f"id: {video['id']} | views: {video.get('view_count') or 0:,} | "
-                f"duration: {format_timestamp(duration) if duration else '?'} | "
+                f"duration: {_format_duration(duration) if duration else '?'} | "
                 f"channel: {video.get('channel') or video.get('uploader') or '?'}\n"
                 f"URL: https://www.youtube.com/watch?v={video['id']}"
             )
@@ -105,6 +104,12 @@ class YoutubeSearchTool(Tool):
         return YoutubeSearchToolResult(
             content="\n\n".join(output)
         )
+
+
+def _format_duration(seconds: int) -> str:
+    hours, rest = divmod(int(seconds), 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"
 
 
 if __name__ == '__main__':

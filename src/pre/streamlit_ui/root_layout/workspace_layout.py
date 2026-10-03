@@ -5,7 +5,7 @@ import streamlit as st
 
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
-from src.pre.streamlit_ui.styles import render_empty_state
+from src.pre.streamlit_ui.styles import render_empty_state, render_panel_header
 from src.pre.call_api.api_client import UnauthorizedError
 
 FILE_ICONS = {
@@ -37,17 +37,39 @@ def render_workspace(
         action: UIActions,
         height: int,
 ):
+    file_count = sum(1 for item in work_space_items if not item.is_directory)
+
+    render_panel_header(
+        title="Workspace",
+        icon=":material/folder_open:",
+        panel="workspace",
+        state=action.state,
+        extra=(lambda: st.badge(f"{file_count} file", color="gray")) if file_count else None,
+    )
+
+    # Hàng nút của file đang mở nằm NGOÀI khung cuộn,
+    # để đọc tới đâu cũng bấm được "quay lại" mà không phải kéo lên đầu file.
+    if opened_file is not None:
+        render_file_preview_header(
+            opened_file,
+            action,
+        )
+
     with st.container(
+            key="workspace_panel",  # CSS đặt chiều cao theo màn hình (xem styles.py)
             height=height,
             border=True,
     ):
         # Đang mở file thì hiện nội dung file,
         # không thì hiện danh sách file.
         if opened_file is not None:
-            render_file_preview(
-                opened_file,
-                action,
-            )
+            with st.container(
+                    key="file_preview",
+            ):
+                render_file_content(
+                    opened_file,
+                    action,
+                )
 
         else:
             render_file_list(
@@ -122,23 +144,13 @@ def render_file_list(
 ):
     tree = build_tree(work_space_items)
 
-    with st.container(
-            horizontal=True,
-            vertical_alignment="center",
-    ):
-        st.markdown(
-            "#### :material/folder_open: Workspace",
-            anchors=False,
-        )
-
-        if tree.file_count:
-            st.badge(
-                f"{tree.file_count} file",
-                color="gray",
-            )
-
-        if tree.folders:
-            # Mở/thu gọn toàn bộ cây
+    # Tiêu đề và số file đã nằm ở header panel, ở đây chỉ còn nút mở/thu gọn toàn bộ cây
+    if tree.folders:
+        with st.container(
+                horizontal=True,
+                horizontal_alignment="right",
+                vertical_alignment="center",
+        ):
             if st.button(
                     ":material/unfold_more:",
                     key="expand_all_folders",
@@ -407,17 +419,19 @@ def _key_safe(path: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", path)
 
 
-def render_file_preview(
+def render_file_preview_header(
         file: StateManager.OpenedFile,
         action: UIActions,
 ):
-    back_col, name_col = st.columns(
-        [1, 9],
-        vertical_alignment="center",
-    )
-
-    with back_col:
-
+    # Một hàng gồm:
+    #
+    # [back] [icon tên file..........] [toàn màn hình]
+    #
+    with st.container(
+            key="file_preview_header",  # CSS dựa vào key này để trừ chiều cao khung cuộn (xem styles.py)
+            horizontal=True,
+            vertical_alignment="center",
+    ):
         if st.button(
                 ":material/arrow_back:",
                 key="close_file",
@@ -428,25 +442,51 @@ def render_file_preview(
 
             st.rerun()
 
-    with name_col:
-
         icon = FILE_ICONS.get(
             file.item_type.lower(),
             DEFAULT_FILE_ICON,
         )
 
         st.markdown(
-            f"**{icon} {file.name}**"
+            f"**{icon} {file.name}**",
+            width="content",
         )
 
-    st.divider()
+        st.space("stretch")
 
+        if st.button(
+                ":material/fullscreen:",
+                key="fullscreen_file",
+                type="tertiary",
+                help="Xem toàn màn hình",
+        ):
+            file_fullscreen_dialog(
+                file,
+                action,
+            )
+
+
+@st.dialog("Xem file", icon=":material/description:", width="large")
+def file_fullscreen_dialog(
+        file: StateManager.OpenedFile,
+        action: UIActions,
+):
+    """
+    Xem file trong dialog lớn, CSS nới rộng gần hết màn hình (xem styles.py).
+    """
+
+    st.markdown(
+        f"**{FILE_ICONS.get(file.item_type.lower(), DEFAULT_FILE_ICON)} {file.name}**"
+    )
+
+    # Key "fullscreen_view" vừa để CSS nhận ra dialog này, vừa làm khung cuộn nội dung
     with st.container(
-            key="file_preview",
+            key="fullscreen_view",
     ):
         render_file_content(
             file,
             action,
+            key_suffix="_fullscreen",  # Panel cũng đang vẽ nút tải về của file này
         )
 
 
@@ -503,9 +543,12 @@ def _upload_dropped_files(
 def render_file_content(
         file: StateManager.OpenedFile,
         action: UIActions,
+        key_suffix: str = "",
 ):
     """
     Render content tương ứng với từng loại file.
+
+    key_suffix tránh trùng key widget khi cùng một file được vẽ ở hai nơi.
     """
 
     file_type = file.item_type.lower()
@@ -524,7 +567,7 @@ def render_file_content(
             ),
             file_name=file.name,
             icon=":material/download:",
-            key=f"preview_download_{file.file_id}",
+            key=f"preview_download_{file.file_id}{key_suffix}",
             on_click="ignore",  # Tải xong không cần vẽ lại trang
         )
         return

@@ -1,6 +1,6 @@
 import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
-from src.pre.streamlit_ui.styles import render_empty_state
+from src.pre.streamlit_ui.styles import render_empty_state, render_panel_header
 
 AVATARS = {
     "user": ":material/person:",
@@ -37,6 +37,7 @@ def render_chat(
         has_conversation: bool,
         error: str | None,
         height,
+        state: StateManager,
 ):
     """
     Render khung chat.
@@ -45,7 +46,15 @@ def render_chat(
     dùng để hiện trạng thái "Agent đang xử lý" trong lúc chờ backend.
     """
 
+    render_panel_header(
+        title="Hội thoại",
+        icon=":material/forum:",
+        panel="chat",
+        state=state,
+    )
+
     with st.container(
+            key="chat_panel",  # CSS đặt chiều cao theo màn hình (xem styles.py)
             height=height,
             border=True,
             autoscroll=True,
@@ -65,7 +74,7 @@ def render_chat(
             )
 
         # Messages
-        for message in messeages_in_current_conversation:
+        for index, message in enumerate(messeages_in_current_conversation):
             with st.chat_message(
                     message.role,
                     avatar=AVATARS.get(message.role),
@@ -78,7 +87,13 @@ def render_chat(
                     ):
                         render_reasoning(message.reasoning)
 
-                st.markdown(message.content)
+                if message.role == "user":
+                    # Avatar tùy chỉnh nên DOM không phân biệt được user/assistant,
+                    # key này là dấu hiệu để CSS tô nền tin nhắn user.
+                    with st.container(key=f"user_msg_{index}"):
+                        st.markdown(message.content)
+                else:
+                    st.markdown(message.content)
 
         if error:
             st.error(

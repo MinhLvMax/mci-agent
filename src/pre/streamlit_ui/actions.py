@@ -140,6 +140,13 @@ class UIActions:
                     )
                 )
 
+            # AI vừa đặt tên cho hội thoại (chỉ ở lượt đầu): sửa ngay trong state,
+            # sau stream layout rerun là sidebar và header hiện tên mới, không cần gọi lại API list.
+            if event["type"] == "title":
+                for conversation in self.state.user_conversations:
+                    if conversation.id == self.state.current_conversation_id:
+                        conversation.title = event["data"]["title"]
+
             yield event
 
         # Agent có thể vừa tạo/xóa/sửa file.
@@ -147,15 +154,33 @@ class UIActions:
             conversation_id=self.state.current_conversation_id
         )
 
-    def create_new_conversation(self, title: str):
+    def create_new_conversation(self, title: str | None = None):
         response = self.api.conversations_api.new(
-            title=title,  # Không cần user_id, backend lấy từ token
+            title=title,  # None thì backend đặt tên tạm, AI đặt tên thật sau tin nhắn đầu
         )
         self.state.current_conversation_id = response.conversation_id
         self.select_conversation(conversation_id=response.conversation_id)
 
         # Để hội thoại mới hiện ngay ở sidebar.
         self.list_conversations()
+
+    def rename_conversation(
+            self,
+            conversation_id: int | str,
+            title: str,
+    ):
+        """
+        User tự đặt tên cho hội thoại.
+
+        Tên khác tên tạm nên sau đó AI không đặt tên đè lên nữa.
+        """
+
+        self.api.conversations_api.update(
+            conversation_id=conversation_id,
+            title=title,
+        )
+
+        self.list_conversations()  # Đổi tên cũng đẩy hội thoại lên đầu danh sách (updated_at)
 
     def delete_conversation(
             self,

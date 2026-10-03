@@ -6,6 +6,8 @@ from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
 from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
 from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
 from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
+from src.inf.tools.research.verify_claims_tool import VerifyClaimsTool
+from src.inf.tools.research.build_outline_tool import BuildOutlineTool
 from src.inf.tools.skill.load_skill_tool import LoadSkillTool
 from src.inf.tools.file.get_file_info_tool import GetFileInfoTool
 from src.inf.tools.file.list_files_tool import ListFilesTool
@@ -53,6 +55,15 @@ def build_reasoner():
     # )
 
 
+def build_title_reasoner():
+    '''Model đặt tên hội thoại: việc ngắn nên suy nghĩ ít cho nhanh'''
+    return OllamaModelReasoner(
+        model='gpt-oss:120b',
+        api_key=Config.OLLAMA_API_KEY,
+        think='low',
+    )
+
+
 def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] = ()):
     # agent_workspace_dir = Config.AGENT_WORKSPACE
 
@@ -72,7 +83,9 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
             # Phân tích: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent,
             # đọc/ghi theo đường dẫn do agent chọn, phần đọc/ghi còn lại dùng tool file bên dưới
             ExtractInsightsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            VerifyClaimsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
             FindUniqueStoriesTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            BuildOutlineTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
 
             # file (không có tool xóa: người dùng tự xóa trên giao diện)
             GetFileInfoTool(workspace_dir=agent_workspace_dir),

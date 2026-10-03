@@ -7,7 +7,6 @@ from pydantic import Field
 
 from src.dom.tool import ToolKwargs, ToolResult, Tool
 from src.inf.tools.file.helper import WorkspacePathGuard, WorkspacePathError, save_text
-from src.inf.tools.research.text_utils import clean_markdown, split_sentences
 
 
 class OpenURLToolKwargs(ToolKwargs):
@@ -125,7 +124,7 @@ class OpenURLTool(Tool):
 
     def _save(self, args: OpenURLToolKwargs, content: str) -> ToolResult:
         '''Lưu toàn văn (đã bỏ link, ảnh, chú thích) vào workspace, chỉ trả tóm tắt'''
-        text = re.sub(r'\n{3,}', '\n\n', clean_markdown(content)).strip()
+        text = re.sub(r'\n{3,}', '\n\n', _clean_markdown(content)).strip()
 
         if len(text) < self.MIN_SAVE_CHARS:
             return OpenURLToolResult(
@@ -144,9 +143,9 @@ class OpenURLTool(Tool):
             return OpenURLToolResult(content=f"Cannot save to '{args.save_to}': {e}")
 
         # Preview lấy từ các câu văn thật, bỏ qua menu/điều hướng ở đầu trang
-        sentences = split_sentences(text)
-        prose = [s for s in sentences if len(s.text) >= 60 and s.text[-1] in '.!?…"”']
-        preview = ' '.join(s.text for s in (prose or sentences)[:3])[:self.PREVIEW_CHARS]
+        sentences = _split_sentences(text)
+        prose = [s for s in sentences if len(s) >= 60 and s[-1] in '.!?…"”']
+        preview = ' '.join((prose or sentences)[:3])[:self.PREVIEW_CHARS]
 
         return OpenURLToolResult(
             content=(
@@ -155,6 +154,32 @@ class OpenURLTool(Tool):
                 f"preview: {preview}..."
             )
         )
+
+
+_SENTENCE_END = re.compile(r'(?<=[.!?…])\s+(?=[\"“\'(\[]?[A-ZÀ-Ỹ0-9])')
+
+
+def _clean_markdown(text: str) -> str:
+    '''Bỏ link, ảnh, chú thích [1] của markdown trích từ web, chỉ giữ chữ'''
+    text = re.sub(r'^\s*\[\d+\]:\s*\S+.*$', '', text, flags=re.MULTILINE)  # Dòng định nghĩa link [1]: http...
+    text = re.sub(r'!\[[^\]]*\]\[\d+\]|!\[[^\]]*\]\([^)]*\)', '', text)  # Ảnh
+    text = re.sub(r'\[\s*([^\]]*?)\s*\]\[\d+\]', r'\1', text)  # [chữ][12] -> chữ
+    text = re.sub(r'\[\s*([^\]]*?)\s*\]\([^)]*\)', r'\1', text)  # [chữ](url) -> chữ
+    text = re.sub(r'\[\d+\]', '', text)  # Chú thích kiểu Wikipedia [5]
+    return text
+
+
+def _split_sentences(text: str) -> list[str]:
+    '''Tách câu để làm preview: bỏ dòng quá ngắn (menu, tiêu đề mục), tách theo dấu kết thúc câu'''
+    sentences = []
+
+    for line in text.splitlines():
+        line = line.strip().lstrip('#>*- ').strip()
+        if len(line) < 20:
+            continue
+        sentences += [s.strip() for s in _SENTENCE_END.split(line) if len(s.strip()) >= 20]
+
+    return sentences
 
 
 if __name__ == "__main__":

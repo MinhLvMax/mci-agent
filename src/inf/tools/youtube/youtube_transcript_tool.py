@@ -8,7 +8,6 @@ from youtube_transcript_api import YouTubeTranscriptApi, YouTubeTranscriptApiExc
 
 from src.dom.tool import Tool, ToolKwargs, ToolResult
 from src.inf.tools.file.helper import WorkspacePathGuard, WorkspacePathError, save_text
-from src.inf.tools.research.text_utils import to_srt
 
 
 class YoutubeTranscriptToolKwargs(ToolKwargs):
@@ -86,7 +85,7 @@ class YoutubeTranscriptTool(Tool):
             saved_path = save_text(
                 self.path_guard,
                 args.save_to or f"transcripts/{video_id}.srt",
-                to_srt(transcript.lines),
+                _to_srt(transcript.lines),
             )
         except WorkspacePathError as e:
             return YoutubeTranscriptToolResult(content=f"Cannot save to '{args.save_to}': {e}")
@@ -100,6 +99,23 @@ class YoutubeTranscriptTool(Tool):
                 f"lines: {len(transcript.lines)}"
             )
         )
+
+
+def _to_srt(lines: list[tuple[float, float, str]]) -> str:
+    '''Ghi phụ đề chuẩn .srt từ danh sách (giây bắt đầu, thời lượng, chữ)'''
+
+    def stamp(seconds: float) -> str:
+        millis = int(round(seconds * 1000))
+        hours, rest = divmod(millis, 3_600_000)
+        minutes, rest = divmod(rest, 60_000)
+        secs, millis = divmod(rest, 1000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+    blocks = [
+        f"{number}\n{stamp(start)} --> {stamp(start + duration)}\n{text}\n"
+        for number, (start, duration, text) in enumerate(lines, 1)
+    ]
+    return "\n".join(blocks)
 
 
 def _parse_video_id(value: str) -> str:

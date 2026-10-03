@@ -1,16 +1,15 @@
-from datetime import datetime
-
 import streamlit as st
 from src.pre.streamlit_ui.styles import render_empty_state
 from src.pre.streamlit_ui.root_layout.workspace_layout import render_workspace
 from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, render_tool_call, AVATARS
-from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar
+from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar, rename_conversation_dialog
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
 from src.pre.streamlit_ui.root_layout.login_layout import render_login
 from src.pre.streamlit_ui.styles import inject_styles
 from src.pre.call_api.api_client import UnauthorizedError
 
+# Chiều cao dự phòng, chiều cao thật do CSS tính theo màn hình (xem styles.py).
 CHAT_HEIGHT = 600
 
 # Khung workspace cao hơn khung chat đúng bằng ô nhập tin nhắn
@@ -56,38 +55,55 @@ def root_layout(
     render_header(
         current_conversation,
         state_manager,
+        actions,
     )
 
     if not has_conversation:  # Chưa chọn hoặc tạo hội thoại
         render_welcome(actions)  # Chỉ hiện màn hình chào, không vẽ khung chat và workspace
         return  # Không có hội thoại thì không có gì để chat hay upload
 
-    left, right = st.columns(
-        [3, 2],
-        gap="medium",
-    )
-    with left:
-        thinking_slot = render_chat(
-            state_manager.messages_in_current_conversation,
-            has_conversation,
-            state_manager.chat_error,
-            CHAT_HEIGHT,
+    maximized = state_manager.maximized_panel
+
+    # Panel nào phóng to thì chiếm cả chiều ngang, panel kia không vẽ.
+    if maximized == "chat":
+        chat_area, workspace_area = st.container(), None
+    elif maximized == "workspace":
+        chat_area, workspace_area = None, st.container()
+    else:
+        # Tỉ lệ ban đầu 3:2, user kéo ranh giới giữa hai cột để đổi (xem styles.py)
+        chat_area, workspace_area = st.columns(
+            [3, 2],
+            gap="medium",
         )
 
-        prompt = st.chat_input(
-            "Nhập yêu cầu cho Agent..."
-            if has_conversation
-            else "Chọn hoặc tạo một hội thoại để bắt đầu",
-            disabled=not has_conversation or pending_prompt is not None,
-        )
+    thinking_slot = None
+    prompt = None
 
-    with right:
-        render_workspace(
-            work_space_items=state_manager.work_space_items,
-            opened_file=state_manager.opened_file,
-            action=actions,
-            height=WORKSPACE_HEIGHT,
-        )
+    if chat_area is not None:
+        with chat_area:
+            thinking_slot = render_chat(
+                state_manager.messages_in_current_conversation,
+                has_conversation,
+                state_manager.chat_error,
+                CHAT_HEIGHT,
+                state_manager,
+            )
+
+            prompt = st.chat_input(
+                "Nhập yêu cầu cho Agent..."
+                if has_conversation
+                else "Chọn hoặc tạo một hội thoại để bắt đầu",
+                disabled=not has_conversation or pending_prompt is not None,
+            )
+
+    if workspace_area is not None:
+        with workspace_area:
+            render_workspace(
+                work_space_items=state_manager.work_space_items,
+                opened_file=state_manager.opened_file,
+                action=actions,
+                height=WORKSPACE_HEIGHT,
+            )
 
     if prompt:
         # Hiện tin nhắn của user ngay, lượt chạy kế tiếp mới gọi Agent.
@@ -99,6 +115,12 @@ def root_layout(
         )
         state_manager.chat_error = None
         state_manager.pending_prompt = str(prompt)
+        st.rerun()
+
+    if pending_prompt is not None and thinking_slot is None:
+        # Đang phóng to Workspace thì không có chỗ hiện câu trả lời,
+        # mở lại khung chat rồi mới chạy Agent ở lượt sau.
+        state_manager.maximized_panel = None
         st.rerun()
 
     if pending_prompt is not None:
@@ -200,11 +222,7 @@ def render_welcome(
                 width="stretch",
                 key="welcome_new_conversation",  # Key riêng để không trùng nút trên sidebar
         ):
-            actions.create_new_conversation(  # Cùng logic với nút "Hội thoại mới" ở sidebar
-                title=datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-            )
+            actions.create_new_conversation()  # Cùng logic với nút "Hội thoại mới" ở sidebar
 
             st.rerun()  # Vẽ lại để hiện khung chat và workspace của hội thoại vừa tạo
 
@@ -212,6 +230,7 @@ def render_welcome(
 def render_header(
         current_conversation: StateManager.Conversation | None,
         state_manager: StateManager,
+        actions: UIActions,
 ):
     if current_conversation is None:
         st.markdown(
@@ -229,10 +248,29 @@ def render_header(
         if not item.is_directory
     ])
 
-    st.markdown(
-        f"#### {current_conversation.title}",
-        anchors=False,
-    )
+    # Một hàng gồm: [tiêu đề hội thoại] [đổi tên]
+    with st.container(
+            horizontal=True,
+            vertical_alignment="center",
+            gap="xsmall",
+    ):
+        st.markdown(
+            f"#### {current_conversation.title}",
+            anchors=False,
+            width="content",
+        )
+
+        if st.button(
+                ":material/edit:",
+                key="rename_current_conversation",  # Key riêng để không trùng mục đổi tên trên sidebar
+                type="tertiary",
+                help="Đổi tên hội thoại",
+        ):
+            rename_conversation_dialog(  # Dùng chung dialog với sidebar
+                actions,
+                current_conversation,
+            )
+
     st.caption(
         f"{len(state_manager.messages_in_current_conversation)} tin nhắn"
         f" · {file_count} file"
