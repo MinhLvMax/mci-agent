@@ -189,9 +189,33 @@ class OllamaModelReasoner(ModelReasoner):
             kwargs=dict(call.function.arguments or {}),
         )
 
+    def list_model(self):
+        import requests
+
+        api_key = Config.OLLAMA_API_KEY
+
+        response = requests.get(
+            "https://ollama.com/api/tags",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+            },
+            timeout=10,
+        )
+
+        response.raise_for_status()
+
+        models = response.json()
+
+        return models['models']
+
 
 def _is_transient(error: Exception) -> bool:
     '''Lỗi đáng gọi lại: server lỗi 5xx, quá tải 429, lỗi gửi giữa luồng stream (status -1) hoặc lỗi kết nối'''
     if isinstance(error, ResponseError):
         return error.status_code >= 500 or error.status_code in (429, -1)
     return True
+
+if __name__ == '__main__':
+    from pprint import pprint
+    o = OllamaModelReasoner()
+    pprint(o.list_model())

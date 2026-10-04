@@ -43,7 +43,8 @@ def build_reasoner():
     return OllamaModelReasoner(
         # host=Config.OLLAMA_HOST,
         # model='qwen3:0.6b',
-        model='gpt-oss:120b',
+        # model='gpt-oss:120b',
+        model='nemotron-3-nano',
         api_key=Config.OLLAMA_API_KEY,
         think='medium',  # gpt-oss chỉ nhận 'low'/'medium'/'high', qwen3 thì dùng True/False
     )

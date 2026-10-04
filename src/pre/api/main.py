@@ -32,4 +32,4 @@ app.include_router(download_file_router)
 app.include_router(upload_file_router)
 
 # Lệnh chạy
-# uvicorn src.pre.call_api.main:app --reload
+# uvicorn src.pre.api.main:app --reload
