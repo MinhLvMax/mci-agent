@@ -48,7 +48,7 @@ class WebSearchToolResult(ToolResult):
         return self.content
 
 
-class WebSearchTool(Tool):
+class DDGSWebSearchTool(Tool):
     tool_name = 'web_search'
     tool_description = (
         "Search the web (DuckDuckGo) for pages and/or news articles. "
@@ -133,5 +133,5 @@ class WebSearchTool(Tool):
 
 
 if __name__ == '__main__':
-    tool = WebSearchTool()
+    tool = DDGSWebSearchTool()
     print(tool.execute(query='Tràng An Ninh Bình', kind='both', max_results=3).to_text())

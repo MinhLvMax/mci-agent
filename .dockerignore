@@ -1,0 +1,11 @@
+.env
+.git
+.idea
+.venv
+__pycache__
+data
+db
+dist
+downloads
+logs
+*.log

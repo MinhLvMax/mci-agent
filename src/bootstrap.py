@@ -1,7 +1,9 @@
 from pathlib import Path
 
-from src.inf.tools.web.web_search_tool import WebSearchTool
-from src.inf.tools.web.open_url_tool import OpenURLTool
+from src.inf.tools.web.ddgs_web_search_tool import DDGSWebSearchTool
+from src.inf.tools.web.ddgs_open_url_tool import DDGSOpenURLTool
+from src.inf.tools.web.tavily_open_url_tool import TavilyOpenURLTool
+from src.inf.tools.web.tavily_web_search_tool import TavilyWebSearchTool
 from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
 from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
 from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
@@ -43,8 +45,9 @@ def build_reasoner():
     return OllamaModelReasoner(
         # host=Config.OLLAMA_HOST,
         # model='qwen3:0.6b',
-        # model='gpt-oss:120b',
-        model='nemotron-3-nano',
+        model='gpt-oss:120b',
+        # model='gpt-oss:20b',
+        # model='nemotron-3-nano:30b',
         api_key=Config.OLLAMA_API_KEY,
         think='medium',  # gpt-oss chỉ nhận 'low'/'medium'/'high', qwen3 thì dùng True/False
     )
@@ -74,12 +77,14 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
     return ToolExecutor(
         tools=[
             # Web
-            WebSearchTool(),
-            OpenURLTool(workspace_dir=agent_workspace_dir),
+            DDGSWebSearchTool(),
+            # DDGSOpenURLTool(workspace_dir=agent_workspace_dir),
+            # TavilyWebSearchTool(api_key=Config.TAVILY_API_KEY),
+            TavilyOpenURLTool(workspace_dir=agent_workspace_dir, api_key=Config.TAVILY_API_KEY),
 
             # YouTube
             YoutubeSearchTool(),
-            YoutubeTranscriptTool(workspace_dir=agent_workspace_dir),
+            # YoutubeTranscriptTool(workspace_dir=agent_workspace_dir),
 
             # Phân tích: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent,
             # đọc/ghi theo đường dẫn do agent chọn, phần đọc/ghi còn lại dùng tool file bên dưới

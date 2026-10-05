@@ -53,7 +53,7 @@ class OpenURLToolResult(ToolResult):
         return self.content
 
 
-class OpenURLTool(Tool):
+class DDGSOpenURLTool(Tool):
     tool_name = "open_url"
 
     tool_description = (
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     import tempfile
 
     with tempfile.TemporaryDirectory() as workspace:
-        tool = OpenURLTool(workspace_dir=workspace)
+        tool = DDGSOpenURLTool(workspace_dir=workspace)
         print(tool.execute(
             url="https://vi.wikipedia.org/wiki/V%E1%BB%8Bnh_H%E1%BA%A1_Long",
             save_to="ha-long/sources/wikipedia.md",

@@ -1,0 +1,4 @@
+# Khi có tên miền: thay ":80" bằng "ten-mien.com" để Caddy tự cấp HTTPS (mở thêm cổng 443)
+:80 {
+	reverse_proxy ui:8501
+}
