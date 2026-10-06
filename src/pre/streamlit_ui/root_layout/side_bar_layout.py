@@ -1,7 +1,7 @@
 import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
-from log import get_logger
+from src.log import get_logger
 
 logger = get_logger(__name__)
 

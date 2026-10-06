@@ -55,6 +55,13 @@ services:
     depends_on:
       - ui
 
+  adminer:
+    image: adminer
+    ports:
+      - "127.0.0.1:8080:8080"   # chỉ server tự truy cập được, bên ngoài không vào được
+    depends_on:
+      - db
+
 volumes:
   pgdata:
   workspace:

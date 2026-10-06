@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from src.pre.call_api.api_client import APIClient
-from log import get_logger
+from src.log import get_logger
 
 logger = get_logger(__name__)
 

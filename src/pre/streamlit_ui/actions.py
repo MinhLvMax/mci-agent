@@ -2,11 +2,10 @@ from typing import Iterator
 
 import requests
 
-from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.composition import APIService
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.call_api.api_client import UnauthorizedError
-from log import get_logger
+from src.log import get_logger
 
 logger = get_logger(__name__)
 
