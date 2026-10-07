@@ -35,8 +35,11 @@ class WebSearchToolKwargs(ToolKwargs):
     )
 
     region: str = Field(
-        default='vn-vi',
-        description="Search region, e.g. 'vn-vi' for Vietnamese results, 'wt-wt' for worldwide."
+        default='wt-wt',
+        description=(
+            "Search region: 'vn-vi' for Vietnamese queries, 'us-en' or 'wt-wt' (worldwide) "
+            "for English queries or places outside Vietnam."
+        )
     )
 
 
@@ -111,9 +114,13 @@ class DDGSWebSearchTool(Tool):
                 unique.append(item)
 
         if not unique:
-            return WebSearchToolResult(
-                content="No results found." + (f" ({'; '.join(errors)})" if errors else "")
-            )
+            if errors:
+                # Lỗi mạng/rate limit khác với không có kết quả: báo model thử lại thay vì bỏ truy vấn
+                return WebSearchToolResult(
+                    content=f"Search failed (network/rate limit): {'; '.join(errors)}. "
+                            f"Retry the same query once, or rephrase it."
+                )
+            return WebSearchToolResult(content="No results found.")
 
         output = []
         for i, item in enumerate(unique, 1):

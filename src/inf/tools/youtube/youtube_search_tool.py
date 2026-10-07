@@ -35,6 +35,14 @@ class YoutubeSearchToolKwargs(ToolKwargs):
         description="Skip videos with fewer views than this."
     )
 
+    details: bool = Field(
+        default=False,
+        description=(
+            "Also open each video to get likes, comments, upload date and description (slower). "
+            "Fields that cannot be read are shown as '?'."
+        )
+    )
+
 
 @dataclass
 class YoutubeSearchToolResult(ToolResult):
@@ -48,8 +56,7 @@ class YoutubeSearchTool(Tool):
     tool_name = 'youtube_search'
     tool_description = (
         "Search YouTube videos and return id, title, channel, view count, duration and URL. "
-        "Use it to find popular videos about a place, then call youtube_transcript with the video id "
-        "to save the video's subtitles into the research project."
+        "Set details=true to also get likes, comments, upload date and description of each video."
     )
 
     tool_kwargs = YoutubeSearchToolKwargs
@@ -60,6 +67,8 @@ class YoutubeSearchTool(Tool):
         'skip_download': True,
         'extract_flat': 'in_playlist',  # Chỉ lấy metadata từ trang kết quả, không mở từng video
     }
+
+    DESCRIPTION_CHARS = 500
 
     def execute(self, **kwargs) -> ToolResult:
         args = self.tool_kwargs(**kwargs)
@@ -99,11 +108,37 @@ class YoutubeSearchTool(Tool):
                 f"duration: {_format_duration(duration) if duration else '?'} | "
                 f"channel: {video.get('channel') or video.get('uploader') or '?'}\n"
                 f"URL: https://www.youtube.com/watch?v={video['id']}"
+                + (f"\n{self._fetch_details(video['id'])}" if args.details else "")
             )
 
         return YoutubeSearchToolResult(
             content="\n\n".join(output)
         )
+
+    def _fetch_details(self, video_id: str) -> str:
+        '''Like, comment, ngày đăng, mô tả chỉ có trên trang từng video nên phải mở riêng; lỗi thì để '?' '''
+        options = {key: value for key, value in self.YDL_OPTIONS.items() if key != 'extract_flat'}
+
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False) or {}
+        except Exception as e:
+            return f"likes: ? | comments: ? | uploaded: ?\n(details failed: {str(e)[:150]})"
+
+        upload_date = info.get('upload_date')  # Dạng YYYYMMDD
+        uploaded = f"{upload_date[6:]}/{upload_date[4:6]}/{upload_date[:4]}" if upload_date else '?'
+        description = ' '.join((info.get('description') or '').split())[:self.DESCRIPTION_CHARS]
+
+        return (
+            f"likes: {_format_count(info.get('like_count'))} | "
+            f"comments: {_format_count(info.get('comment_count'))} | "
+            f"uploaded: {uploaded}\n"
+            f"description: {description or '?'}"
+        )
+
+
+def _format_count(value: int | None) -> str:
+    return f"{value:,}" if value is not None else '?'
 
 
 def _format_duration(seconds: int) -> str:
@@ -114,4 +149,4 @@ def _format_duration(seconds: int) -> str:
 
 if __name__ == '__main__':
     tool = YoutubeSearchTool()
-    print(tool.execute(query='Vịnh Hạ Long', max_results=5).to_text())
+    print(tool.execute(query='Just Room Enough Island', max_results=3, details=True).to_text())

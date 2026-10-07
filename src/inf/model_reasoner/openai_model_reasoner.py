@@ -21,9 +21,13 @@ class OpenAIModelReasoner(ModelReasoner):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str | None = None
+        model: str | None = None,
+        reasoning_effort: str | None = 'high',
     ):
         api_key = api_key or Config.OPEN_API_KEY
+
+        # Mức suy nghĩ bên trong mỗi lần ra quyết định ('low'/'medium'/'high'), None thì để model tự chọn
+        self.reasoning_effort = reasoning_effort
 
         self.client = OpenAI(
             api_key=api_key
@@ -36,6 +40,29 @@ class OpenAIModelReasoner(ModelReasoner):
         context: Context,
         tools: list[Tool]
     ) -> Decision:
+        return self._to_decision(self._create_response(context, tools))
+
+    def decide_stream(
+        self,
+        context: Context,
+        tools: list[Tool]
+    ) -> Generator[AgentEvent, None, Decision]:
+        '''Chưa stream từng chữ với OpenAI: gọi model xong thì phát tóm tắt suy nghĩ thành event thinking'''
+        response = self._create_response(context, tools)
+
+        for item in response.output:
+            if item.type == "reasoning":
+                for part in item.summary or []:
+                    if part.text:
+                        yield AgentEvent(type='thinking', data={"text": part.text + "\n\n"})
+
+        return self._to_decision(response)
+
+    def _create_response(
+        self,
+        context: Context,
+        tools: list[Tool]
+    ):
 
         # -------------------------
         # Convert messages
@@ -66,13 +93,22 @@ class OpenAIModelReasoner(ModelReasoner):
         # Call OpenAI
         # -------------------------
 
-        response = self.client.responses.create(
+        return self.client.responses.create(
             model=self.model,
             input=input_items,
             # Gọi không kèm tool (vd: tool nội bộ cần LLM trả JSON) thì không gửi tham số tools
             tools=tool_schemas or NOT_GIVEN,
             tool_choice="auto" if tool_schemas else NOT_GIVEN,
+            reasoning=(
+                {"effort": self.reasoning_effort, "summary": "auto"}
+                if self.reasoning_effort else NOT_GIVEN
+            ),
+            # Không lưu phía OpenAI nên tự gửi lại reasoning đã mã hóa ở lượt sau, model mới nhớ vì sao gọi tool
+            store=False,
+            include=["reasoning.encrypted_content"],
         )
+
+    def _to_decision(self, response) -> Decision:
 
         # -------------------------
         # Check tool calls
@@ -88,7 +124,12 @@ class OpenAIModelReasoner(ModelReasoner):
 
         if tool_calls:
             return ToolCallDecision(
-                tool_calls=tool_calls
+                tool_calls=tool_calls,
+                provider_items=[
+                    item.model_dump(exclude_none=True)
+                    for item in response.output
+                    if item.type == "reasoning"
+                ],
             )
 
         # -------------------------
@@ -98,15 +139,6 @@ class OpenAIModelReasoner(ModelReasoner):
         return FinalDecision(
             final_content=response.output_text or ""
         )
-
-    def decide_stream(
-        self,
-        context: Context,
-        tools: list[Tool]
-    ) -> Generator[AgentEvent, None, Decision]:
-        '''Chưa stream với OpenAI: gọi decide như cũ, không phát event thinking nào'''
-        return self.decide(context, tools)
-        yield  # Có yield thì Python mới coi hàm này là generator
 
     # =========================================================
     # MESSAGE MAPPER
@@ -170,7 +202,8 @@ class OpenAIModelReasoner(ModelReasoner):
         message: ToolCallMessage
     ) -> list[dict]:
 
-        return [
+        # Reasoning phải đứng ngay trước function_call của cùng lượt
+        return list(message.provider_items) + [
             {
                 "type": "function_call",
                 "call_id": call.tool_call_id,

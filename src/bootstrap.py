@@ -56,6 +56,7 @@ def build_reasoner():
         api_key=Config.OPEN_API_KEY,
         model="gpt-5.6-luna",
         # model='gpt-5-nano'
+        reasoning_effort="high",
     )
 
 
@@ -88,10 +89,10 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
 
             # Phân tích: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent,
             # đọc/ghi theo đường dẫn do agent chọn, phần đọc/ghi còn lại dùng tool file bên dưới
-            ExtractInsightsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
-            VerifyClaimsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
-            FindUniqueStoriesTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
-            BuildOutlineTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            # ExtractInsightsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            # VerifyClaimsTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            # FindUniqueStoriesTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
+            # BuildOutlineTool(workspace_dir=agent_workspace_dir, reasoner=reasoner),
 
             # file (không có tool xóa: người dùng tự xóa trên giao diện)
             GetFileInfoTool(workspace_dir=agent_workspace_dir),
@@ -104,7 +105,7 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
             RenamePathTool(workspace_dir=agent_workspace_dir),
 
             # Skill
-            *([LoadSkillTool(skills=on_demand_skills)] if on_demand_skills else []),
+            # *([LoadSkillTool(skills=on_demand_skills)] if on_demand_skills else []),
         ]
     )
 

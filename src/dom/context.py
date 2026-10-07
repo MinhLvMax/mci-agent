@@ -18,11 +18,12 @@ class Context:
             )
         )
 
-    def add_tool_call_message(self, tool_calls: list[ToolCall]):
+    def add_tool_call_message(self, tool_calls: list[ToolCall], provider_items: list[dict] = ()):
         self.messages.append(
             ToolCallMessage(
                 role='assistant',
-                list_tool_call=tool_calls
+                list_tool_call=tool_calls,
+                provider_items=list(provider_items)
             )
         )
 

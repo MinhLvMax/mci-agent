@@ -51,7 +51,8 @@ class AgentService:
                 Config.logger.debug(f'Preparing to execute {len(decision.tool_calls)} tool calls.')
 
                 context.add_tool_call_message(
-                    tool_calls=decision.tool_calls
+                    tool_calls=decision.tool_calls,
+                    provider_items=decision.provider_items
                 )
 
                 for call in decision.tool_calls:
