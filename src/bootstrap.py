@@ -6,6 +6,9 @@ from src.inf.tools.web.tavily_open_url_tool import TavilyOpenURLTool
 from src.inf.tools.web.tavily_web_search_tool import TavilyWebSearchTool
 from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
 from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
+from src.inf.tools.youtube.nexlev_youtube_search_tool import NexlevYoutubeSearchTool
+from src.inf.tools.youtube.nexlev_youtube_transcript_tool import NexlevYoutubeTranscriptTool
+from src.inf.tools.youtube.nexlev_youtube_comments_tool import NexlevYoutubeCommentsTool
 from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
 from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
 from src.inf.tools.research.verify_claims_tool import VerifyClaimsTool
@@ -84,8 +87,13 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
             TavilyOpenURLTool(workspace_dir=agent_workspace_dir, api_key=Config.TAVILY_API_KEY),
 
             # YouTube
-            YoutubeSearchTool(),
+            # YoutubeSearchTool(),  # Bị YouTube chặn IP, thay bằng nexlev_youtube_search
             # YoutubeTranscriptTool(workspace_dir=agent_workspace_dir),
+
+            # NexLev: lấy dữ liệu YouTube qua API của NexLev nên không bị chặn IP
+            NexlevYoutubeSearchTool(nexlev_api_key=Config.NEXLEV_API_KEY, youtube_api_key=Config.YOUTUBE_API_KEY),
+            NexlevYoutubeTranscriptTool(workspace_dir=agent_workspace_dir, api_key=Config.NEXLEV_API_KEY),
+            NexlevYoutubeCommentsTool(workspace_dir=agent_workspace_dir, api_key=Config.NEXLEV_API_KEY),
 
             # Phân tích: các tool lọc thông tin cần gọi model nên nhận chung reasoner với agent,
             # đọc/ghi theo đường dẫn do agent chọn, phần đọc/ghi còn lại dùng tool file bên dưới

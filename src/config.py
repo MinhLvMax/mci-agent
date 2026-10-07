@@ -58,6 +58,8 @@ class Config:
     OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY')
     OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
     TAVILY_API_KEY = os.getenv('TAVILY_API_KEY')
+    NEXLEV_API_KEY = os.getenv('NEXLEV_API_KEY')
+    YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 
     AGENT_ROOT_WORKSPACE = Path(os.getenv('AGENT_ROOT_WORKSPACE'))
     AGENT_ROOT_WORKSPACE.mkdir(exist_ok=True, parents=True)
