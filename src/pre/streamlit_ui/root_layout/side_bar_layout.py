@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
@@ -146,6 +147,51 @@ def render_sidebar(
                                     action,
                                     conversation,
                                 )
+
+
+@st.dialog("Góp ý", icon=":material/feedback:")
+def feedback_dialog(
+        action: UIActions,
+):
+    """
+    Nhập nội dung rồi bấm Gửi, hội thoại đang mở được gắn tự động.
+    """
+
+    # Form để chỉ gửi khi bấm nút, không gửi theo từng lần gõ
+    with st.form(
+            key="feedback_form",
+            border=False,
+    ):
+        content = st.text_area(
+            "Nội dung góp ý",
+            placeholder="Bạn gặp lỗi gì, hay muốn thêm tính năng gì?",
+            max_chars=2000,  # Khớp giới hạn của backend
+            label_visibility="collapsed",
+        )
+
+        sent = st.form_submit_button(
+            "Gửi",
+            icon=":material/send:",
+            type="primary",
+            width="stretch",
+        )
+
+    if sent:
+        content = content.strip()
+
+        if not content:
+            st.warning("Nội dung góp ý không được để trống.", icon=":material/warning:")
+            return
+
+        try:
+            action.send_feedback(content)
+
+        except requests.RequestException:  # Backend lỗi hoặc không kết nối được, giữ dialog để user gửi lại
+            st.error("Gửi góp ý thất bại, vui lòng thử lại.", icon=":material/error:")
+            return
+
+        st.toast("Cảm ơn bạn đã góp ý!", icon=":material/check_circle:")
+        st.rerun()
 
 
 @st.dialog("Đổi tên hội thoại", icon=":material/edit:")

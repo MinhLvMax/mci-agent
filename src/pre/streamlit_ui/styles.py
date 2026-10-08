@@ -77,6 +77,17 @@ body:has(.st-key-file_preview_header) [data-testid="stLayoutWrapper"]:has(> .st-
     white-space: nowrap;  /* Tên file dài thì cắt bằng ..., không đẩy nút xuống dòng */
 }
 
+/* ===== Nút Góp ý ghim ở góc trên bên phải, cạnh menu ⋮ của Streamlit (xem render_feedback_button) =====
+   Ghim cả khối bọc ngoài để nó không chiếm một khoảng trống ở đầu trang. */
+.st-key-feedback_corner,
+[data-testid="stLayoutWrapper"]:has(> .st-key-feedback_corner) {
+    position: fixed;
+    top: 0.6rem;
+    right: 3.5rem;      /* Chừa chỗ cho menu ⋮ */
+    z-index: 999991;    /* Nằm trên thanh header của Streamlit */
+    width: auto;
+}
+
 /* ===== Tay kéo ranh giới Chat | Workspace (xem _SPLITTER_JS) ===== */
 /* Khối chỉ chứa script, không chiếm chỗ */
 .st-key-splitter_js,

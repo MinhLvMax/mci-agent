@@ -2,7 +2,7 @@ import streamlit as st
 from src.pre.streamlit_ui.styles import render_empty_state
 from src.pre.streamlit_ui.root_layout.workspace_layout import render_workspace
 from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, render_tool_call, AVATARS
-from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar, rename_conversation_dialog
+from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar, rename_conversation_dialog, feedback_dialog
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
 from src.pre.streamlit_ui.root_layout.login_layout import render_login
@@ -39,6 +39,8 @@ def root_layout(
         actions,
         state_manager,
     )
+
+    render_feedback_button(actions)
 
     current_conversation = next(
         (
@@ -197,6 +199,23 @@ def render_agent_stream(
     except Exception as e:
         status.update(label="Agent gặp lỗi", state="error")
         state_manager.chat_error = str(e)
+
+
+def render_feedback_button(
+        actions: UIActions,
+):
+    """
+    Nút Góp ý luôn nằm ở góc trên bên phải, màn hình nào cũng bấm được ngay.
+    """
+
+    with st.container(key="feedback_corner"):  # CSS ghim khối này lên góc trên bên phải (xem styles.py)
+        if st.button(
+                "Góp ý",
+                key="feedback",
+                icon=":material/feedback:",
+                type="secondary",
+        ):
+            feedback_dialog(actions)
 
 
 def render_welcome(

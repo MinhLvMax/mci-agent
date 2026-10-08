@@ -210,6 +210,19 @@ class UIActions:
 
         return True
 
+    def send_feedback(self, content: str):
+        """
+        Gửi góp ý của user.
+
+        Tự gắn hội thoại đang mở (nếu có) để biết góp ý thuộc ngữ cảnh nào,
+        user không phải chọn gì thêm.
+        """
+
+        self.api.feedback_api.send(
+            content=content,
+            conversation_id=self.state.current_conversation_id,
+        )
+
     def list_files(
             self,
             conversation_id: int | str
