@@ -8,7 +8,8 @@ WORKDIR /app
 
 # Cài thư viện trước để Docker cache lại, chỉ cài lại khi requirements thay đổi
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN #pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY .streamlit ./.streamlit
 COPY src ./src

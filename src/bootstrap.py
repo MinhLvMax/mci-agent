@@ -121,7 +121,6 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
 def build_workspace_service() -> WorkspaceService:
     """
     Tạo service quản lý workspace.
-
     ROOT_AGENT_WORKSPACE là thư mục gốc chứa toàn bộ
     workspace của các user/conversation.
     """
