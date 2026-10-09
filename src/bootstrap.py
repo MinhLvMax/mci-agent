@@ -1,19 +1,19 @@
 from pathlib import Path
 
 from src.inf.tools.web.ddgs_web_search_tool import DDGSWebSearchTool
-from src.inf.tools.web.ddgs_open_url_tool import DDGSOpenURLTool
+# from src.inf.tools.web.ddgs_open_url_tool import DDGSOpenURLTool
 from src.inf.tools.web.tavily_open_url_tool import TavilyOpenURLTool
-from src.inf.tools.web.tavily_web_search_tool import TavilyWebSearchTool
-from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
-from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
+# from src.inf.tools.web.tavily_web_search_tool import TavilyWebSearchTool
+# from src.inf.tools.youtube.youtube_search_tool import YoutubeSearchTool
+# from src.inf.tools.youtube.youtube_transcript_tool import YoutubeTranscriptTool
 from src.inf.tools.youtube.nexlev_youtube_search_tool import NexlevYoutubeSearchTool
 from src.inf.tools.youtube.nexlev_youtube_transcript_tool import NexlevYoutubeTranscriptTool
 from src.inf.tools.youtube.nexlev_youtube_comments_tool import NexlevYoutubeCommentsTool
-from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
-from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
-from src.inf.tools.research.verify_claims_tool import VerifyClaimsTool
-from src.inf.tools.research.build_outline_tool import BuildOutlineTool
-from src.inf.tools.skill.load_skill_tool import LoadSkillTool
+# from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
+# from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
+# from src.inf.tools.research.verify_claims_tool import VerifyClaimsTool
+# from src.inf.tools.research.build_outline_tool import BuildOutlineTool
+# from src.inf.tools.skill.load_skill_tool import LoadSkillTool
 from src.inf.tools.file.get_file_info_tool import GetFileInfoTool
 from src.inf.tools.file.list_files_tool import ListFilesTool
 from src.inf.tools.file.move_path_tool import MovePathTool
@@ -24,15 +24,15 @@ from src.inf.tools.file.search_files_tool import SearchFilesTool
 from src.inf.tools.file.write_file_tool import WriteFileTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
-from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
-from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
+# from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
+# from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
 from src.app.services.workspace_service import WorkspaceService
-from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.usecases.chat_usecase import ChatUseCase
+# from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
+# from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
+# from src.app.services.postgre_db import create_postgres_connection
+# from src.app.usecases.chat_usecase import ChatUseCase
 from src.app.services.jwt_service import JWTService
 from src.dom.entities.skill import Skill
 # from src.pre.controllers.agent.agent_controller import AgentController
@@ -65,11 +65,13 @@ def build_reasoner():
 
 def build_title_reasoner():
     '''Model đặt tên hội thoại: việc ngắn nên suy nghĩ ít cho nhanh'''
-    return OllamaModelReasoner(
-        model='gpt-oss:120b',
-        api_key=Config.OLLAMA_API_KEY,
-        think='low',
-    )
+    # return OllamaModelReasoner(
+    #     model='gpt-oss:120b',
+    #     api_key=Config.OLLAMA_API_KEY,
+    #     think='low',
+    # )
+
+    return build_reasoner()
 
 
 def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] = ()):
