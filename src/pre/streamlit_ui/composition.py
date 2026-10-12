@@ -5,6 +5,8 @@ from src.pre.call_api.conversations_api import ConversationAPI
 from src.pre.call_api.message_api import MessageAPI
 from src.pre.call_api.file_api import FileAPI
 from src.pre.call_api.feedback_api import FeedbackAPI
+from src.pre.call_api.memory_api import MemoryAPI
+from src.pre.call_api.admin_api import AdminAPI
 
 
 class APIService:
@@ -17,6 +19,8 @@ class APIService:
             message_api: MessageAPI,
             file_api: FileAPI,
             feedback_api: FeedbackAPI,
+            memory_api: MemoryAPI,
+            admin_api: AdminAPI,
     ):
         self.client = client  # Giữ client để cập nhật token ngay sau khi đăng nhập
         self.chat_api = chat_api
@@ -25,6 +29,8 @@ class APIService:
         self.message_api = message_api
         self.file_api = file_api
         self.feedback_api = feedback_api
+        self.memory_api = memory_api
+        self.admin_api = admin_api
 
 
 def build_api_service(
@@ -52,6 +58,12 @@ def build_api_service(
     feedback_api = FeedbackAPI(
         client=api_client
     )
+    memory_api = MemoryAPI(
+        client=api_client
+    )
+    admin_api = AdminAPI(
+        client=api_client
+    )
 
     return APIService(
         api_client,
@@ -60,7 +72,9 @@ def build_api_service(
         conversations_api,
         message_api,
         file_api,
-        feedback_api
+        feedback_api,
+        memory_api,
+        admin_api
     )
 
 

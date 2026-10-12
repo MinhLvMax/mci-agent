@@ -15,6 +15,8 @@ class FeedbackAPI:
             self,
             content: str,
             conversation_id: int | str | None = None,
+            rating: int | None = None,  # 1 = 👍, -1 = 👎
+            kind: str | None = None,  # 'correction' | 'preference' | 'bug' | 'other'
     ):
         response = self.client.post(
             path='/send_feedback/',  # Thêm "/" cuối để khớp route, tránh FastAPI redirect 307
@@ -22,6 +24,8 @@ class FeedbackAPI:
             json={
                 'content': content,
                 'conversation_id': conversation_id,
+                'rating': rating,
+                'kind': kind,
             },
         )
         response.raise_for_status()

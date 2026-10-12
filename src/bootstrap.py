@@ -9,11 +9,6 @@ from src.inf.tools.web.tavily_open_url_tool import TavilyOpenURLTool
 from src.inf.tools.youtube.nexlev_youtube_search_tool import NexlevYoutubeSearchTool
 from src.inf.tools.youtube.nexlev_youtube_transcript_tool import NexlevYoutubeTranscriptTool
 from src.inf.tools.youtube.nexlev_youtube_comments_tool import NexlevYoutubeCommentsTool
-# from src.inf.tools.research.extract_insights_tool import ExtractInsightsTool
-# from src.inf.tools.research.find_unique_stories_tool import FindUniqueStoriesTool
-# from src.inf.tools.research.verify_claims_tool import VerifyClaimsTool
-# from src.inf.tools.research.build_outline_tool import BuildOutlineTool
-# from src.inf.tools.skill.load_skill_tool import LoadSkillTool
 from src.inf.tools.file.get_file_info_tool import GetFileInfoTool
 from src.inf.tools.file.list_files_tool import ListFilesTool
 from src.inf.tools.file.move_path_tool import MovePathTool
@@ -22,6 +17,9 @@ from src.inf.tools.file.read_file_tool import ReadFileTool
 from src.inf.tools.file.rename_path_tool import RenamePathTool
 from src.inf.tools.file.search_files_tool import SearchFilesTool
 from src.inf.tools.file.write_file_tool import WriteFileTool
+from src.inf.tools.memory.remember_tool import RememberTool
+from src.inf.tools.skill.load_skill_tool import LoadSkillTool
+from src.inf.tools.memory.forget_tool import ForgetTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 # from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
@@ -29,6 +27,7 @@ from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
 from src.app.services.workspace_service import WorkspaceService
+from src.app.services.memory_service import MemoryService
 # from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
 # from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 # from src.app.services.postgre_db import create_postgres_connection
@@ -74,7 +73,23 @@ def build_title_reasoner():
     return build_reasoner()
 
 
-def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] = ()):
+def build_lesson_reasoner():
+    '''Model trích bài học sau mỗi lượt chat: chạy mọi lượt nên suy nghĩ ít cho rẻ và nhanh'''
+    return OpenAIModelReasoner(
+        api_key=Config.OPEN_API_KEY,
+        model="gpt-5.6-luna",
+        reasoning_effort="low",
+    )
+
+
+def build_tool_manager(
+        agent_workspace_dir: Path,
+        reasoner,
+        skills: list[Skill] = (),
+        memory_service: MemoryService | None = None,
+        user_id: int | None = None,
+        conversation_id: int | None = None,
+):
     # agent_workspace_dir = Config.AGENT_WORKSPACE
 
     # Skill không always_on chỉ được liệt kê tên trong system prompt, agent dùng load_skill để đọc chỉ dẫn đầy đủ
@@ -115,7 +130,16 @@ def build_tool_manager(agent_workspace_dir: Path, reasoner, skills: list[Skill] 
             RenamePathTool(workspace_dir=agent_workspace_dir),
 
             # Skill
-            # *([LoadSkillTool(skills=on_demand_skills)] if on_demand_skills else []),
+            *([LoadSkillTool(skills=on_demand_skills)] if on_demand_skills else []),
+
+            # Bộ nhớ dài hạn: chỉ có khi router truyền user đang đăng nhập
+            *(
+                [
+                    RememberTool(memory_service=memory_service, user_id=user_id, conversation_id=conversation_id),
+                    ForgetTool(memory_service=memory_service, user_id=user_id),
+                ]
+                if memory_service is not None and user_id is not None else []
+            ),
         ]
     )
 
@@ -139,12 +163,25 @@ def build_jwt_service() -> JWTService:
     )
 
 
-def build_agent_service(agent_workspace_dir, skills: list[Skill] = ()):
+def build_agent_service(
+        agent_workspace_dir,
+        skills: list[Skill] = (),
+        memory_service: MemoryService | None = None,
+        user_id: int | None = None,
+        conversation_id: int | None = None,
+):
     reasoner = build_reasoner()
 
     return AgentService(
         model_reasoner=reasoner,
-        tool_executor=build_tool_manager(agent_workspace_dir, reasoner, skills),
+        tool_executor=build_tool_manager(
+            agent_workspace_dir,
+            reasoner,
+            skills,
+            memory_service=memory_service,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        ),
     )
 
 # def build_agent_controller():

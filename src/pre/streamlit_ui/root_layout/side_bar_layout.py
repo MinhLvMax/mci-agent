@@ -2,6 +2,7 @@ import requests
 import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
+from src.pre.streamlit_ui.root_layout.memory_layout import memories_dialog
 from src.log import get_logger
 
 logger = get_logger(__name__)
@@ -62,8 +63,30 @@ def render_sidebar(
                 type="primary"
         ):
             action.create_new_conversation()  # Tên tạm, AI đặt tên sau tin nhắn đầu tiên
+            state.current_page = 'chat'
 
             st.rerun()
+
+        if st.button(
+                "Ghi nhớ của Agent",
+                icon=":material/psychology:",
+                width="stretch",
+                type="secondary",
+                help="Những gì agent đã học từ các lượt chat và góp ý",
+        ):
+            memories_dialog(action)
+
+        if user and user.role == 'admin':
+            on_admin = state.current_page == 'admin'
+            if st.button(
+                    "Về chat" if on_admin else "Quản trị",
+                    icon=":material/forum:" if on_admin else ":material/admin_panel_settings:",
+                    width="stretch",
+                    type="secondary",
+                    key="toggle_admin_page",
+            ):
+                state.current_page = 'chat' if on_admin else 'admin'
+                st.rerun()
 
         st.divider()
 
@@ -116,6 +139,7 @@ def render_sidebar(
                             action.select_conversation(
                                 conversation.id
                             )
+                            state.current_page = 'chat'  # Đang ở trang Quản trị mà chọn hội thoại thì quay về chat
 
                             st.rerun()
 
@@ -149,22 +173,47 @@ def render_sidebar(
                                 )
 
 
+FEEDBACK_KINDS = {
+    "correction": "Agent trả lời sai",
+    "preference": "Muốn agent làm khác đi",
+    "bug": "Lỗi phần mềm",
+    "other": "Khác",
+}
+
+
 @st.dialog("Góp ý", icon=":material/feedback:")
 def feedback_dialog(
         action: UIActions,
+        rating: int | None = None,  # -1 khi mở từ nút 👎 dưới câu trả lời
 ):
     """
     Nhập nội dung rồi bấm Gửi, hội thoại đang mở được gắn tự động.
+    Agent đọc góp ý để rút kinh nghiệm cho các lần sau.
     """
+
+    if rating == -1:
+        st.caption("Câu trả lời chưa ổn ở đâu? Agent sẽ ghi nhớ để lần sau làm tốt hơn.")
 
     # Form để chỉ gửi khi bấm nút, không gửi theo từng lần gõ
     with st.form(
             key="feedback_form",
             border=False,
     ):
+        kind = st.segmented_control(
+            "Loại góp ý",
+            options=list(FEEDBACK_KINDS),
+            format_func=FEEDBACK_KINDS.get,
+            default="correction" if rating == -1 else None,
+            label_visibility="collapsed",
+        )
+
         content = st.text_area(
             "Nội dung góp ý",
-            placeholder="Bạn gặp lỗi gì, hay muốn thêm tính năng gì?",
+            placeholder=(
+                "VD: Giá phải ghi bằng VNĐ / Trả lời ngắn hơn, dùng gạch đầu dòng"
+                if rating == -1 else
+                "Bạn gặp lỗi gì, muốn agent làm khác đi thế nào, hay muốn thêm tính năng gì?"
+            ),
             max_chars=2000,  # Khớp giới hạn của backend
             label_visibility="collapsed",
         )
@@ -179,12 +228,12 @@ def feedback_dialog(
     if sent:
         content = content.strip()
 
-        if not content:
+        if not content and rating is None:  # Từ nút 👎 thì được gửi không kèm nội dung
             st.warning("Nội dung góp ý không được để trống.", icon=":material/warning:")
             return
 
         try:
-            action.send_feedback(content)
+            action.send_feedback(content, rating=rating, kind=kind)
 
         except requests.RequestException:  # Backend lỗi hoặc không kết nối được, giữ dialog để user gửi lại
             st.error("Gửi góp ý thất bại, vui lòng thử lại.", icon=":material/error:")

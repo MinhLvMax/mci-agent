@@ -32,12 +32,28 @@ def render_reasoning(steps: list[dict]):
             render_tool_call(step)
 
 
+def render_rating(on_rate, state: StateManager, index: int):
+    """
+    👍/👎 cho câu trả lời mới nhất. Mỗi câu chỉ gửi một lần,
+    key gắn với hội thoại + vị trí tin nhắn để đổi hội thoại không bị lẫn.
+    """
+    key = f"rate_{state.current_conversation_id}_{index}"
+    sent_key = f"{key}_sent"
+
+    value = st.feedback("thumbs", key=key, disabled=st.session_state.get(sent_key, False))
+
+    if value is not None and not st.session_state.get(sent_key):
+        st.session_state[sent_key] = True
+        on_rate(1 if value == 1 else -1)
+
+
 def render_chat(
         messeages_in_current_conversation: list[StateManager.Message],
         has_conversation: bool,
         error: str | None,
         height,
         state: StateManager,
+        on_rate=None,  # Hàm (rating) gọi khi user bấm 👍/👎 dưới câu trả lời cuối
 ):
     """
     Render khung chat.
@@ -94,6 +110,10 @@ def render_chat(
                         st.markdown(message.content)
                 else:
                     st.markdown(message.content)
+
+                    is_last = index == len(messeages_in_current_conversation) - 1
+                    if is_last and on_rate is not None:
+                        render_rating(on_rate, state, index)
 
         if error:
             st.error(

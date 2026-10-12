@@ -15,3 +15,5 @@ class Skill:
     always_on: bool = False
     config: dict = field(default_factory=dict)  # config_json, vd {"tools": [...]}
     id: int | None = None
+    is_active: bool = True  # Tắt thì skill không vào prompt (skill mới tạo trên trang quản trị mặc định tắt)
+    sort_order: int = 0

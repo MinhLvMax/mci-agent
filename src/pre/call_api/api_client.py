@@ -41,3 +41,6 @@ class APIClient:
 
     def delete(self, path: str, **kwargs):
         return self._request("DELETE", path, **kwargs)  # Đi qua _request để luôn có token
+
+    def patch(self, path: str, **kwargs):
+        return self._request("PATCH", path, **kwargs)  # Đi qua _request để luôn có token

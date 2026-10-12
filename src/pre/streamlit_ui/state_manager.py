@@ -9,6 +9,7 @@ class StateManager:
     class User:
         user_id: str | int
         email: str
+        role: str = 'user'  # Chỉ dùng để ẩn/hiện nút Quản trị, quyền thật do backend kiểm tra
 
     @property
     def user(self) -> User:
@@ -40,6 +41,17 @@ class StateManager:
 
     def logout(self):
         st.session_state.clear()  # Xóa toàn bộ phiên: user, token, hội thoại, file đang mở
+
+    # ===
+
+    # Trang đang xem: khung chat hoặc trang Quản trị (chỉ admin)
+    @property
+    def current_page(self) -> Literal["chat", "admin"]:
+        return st.session_state.get("current_page", "chat")
+
+    @current_page.setter
+    def current_page(self, value: Literal["chat", "admin"]):
+        st.session_state["current_page"] = value
 
     # ===
 

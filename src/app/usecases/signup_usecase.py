@@ -20,6 +20,28 @@ class EmailAlreadyExistsError(Exception):
     """Email đã có tài khoản."""
 
 
+def validate_email(email: str) -> str:
+    '''Chuẩn hóa và kiểm tra email, trả về email đã chuẩn hóa'''
+    email = email.strip().lower()  # Chuẩn hóa để không có 2 tài khoản chỉ khác hoa thường
+
+    if not EMAIL_PATTERN.match(email):  # Email sai định dạng
+        raise SignupValidationError("Invalid email address")
+
+    return email
+
+
+def validate_password(password: str):
+    if len(password) < MIN_PASSWORD_LENGTH:  # Mật khẩu quá ngắn
+        raise SignupValidationError(
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+        )
+
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:  # Đếm theo byte vì chữ có dấu tốn 2-3 byte
+        raise SignupValidationError(
+            f"Password must be at most {MAX_PASSWORD_BYTES} bytes"
+        )
+
+
 @dataclass
 class SignupUserCommand:
     email: str
@@ -47,20 +69,8 @@ class SignupUseCase:
             command: SignupUserCommand
     ) -> SignupUserResult:
 
-        email = command.email.strip().lower()  # Chuẩn hóa để không có 2 tài khoản chỉ khác hoa thường
-
-        if not EMAIL_PATTERN.match(email):  # Email sai định dạng
-            raise SignupValidationError("Invalid email address")
-
-        if len(command.password) < MIN_PASSWORD_LENGTH:  # Mật khẩu quá ngắn
-            raise SignupValidationError(
-                f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
-            )
-
-        if len(command.password.encode("utf-8")) > MAX_PASSWORD_BYTES:  # Đếm theo byte vì chữ có dấu tốn 2-3 byte
-            raise SignupValidationError(
-                f"Password must be at most {MAX_PASSWORD_BYTES} bytes"
-            )
+        email = validate_email(command.email)
+        validate_password(command.password)
 
         if self.user_repository.get_user_by_email(email) is not None:  # Email đã được đăng ký
             raise EmailAlreadyExistsError("Email already registered")

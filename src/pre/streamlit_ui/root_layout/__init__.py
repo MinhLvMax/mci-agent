@@ -8,6 +8,7 @@ from src.pre.streamlit_ui.actions import UIActions
 from src.pre.streamlit_ui.root_layout.login_layout import render_login
 from src.pre.streamlit_ui.styles import inject_styles
 from src.pre.call_api.api_client import UnauthorizedError
+from src.pre.streamlit_ui.root_layout.admin_layout import render_admin
 
 # Chiều cao dự phòng, chiều cao thật do CSS tính theo màn hình (xem styles.py).
 CHAT_HEIGHT = 600
@@ -41,6 +42,10 @@ def root_layout(
     )
 
     render_feedback_button(actions)
+
+    if state_manager.current_page == 'admin' and state_manager.user.role == 'admin':
+        render_admin(actions, state_manager)
+        return  # Trang quản trị không vẽ khung chat và workspace
 
     current_conversation = next(
         (
@@ -89,6 +94,7 @@ def root_layout(
                 state_manager.chat_error,
                 CHAT_HEIGHT,
                 state_manager,
+                on_rate=lambda rating: on_rate(actions, rating),
             )
 
             prompt = st.chat_input(
@@ -187,6 +193,9 @@ def render_agent_stream(
                 with slot.container():
                     render_tool_call({**call, "result": data["result"]})
 
+                if call["name"] == "remember" and data["result"].startswith(("Saved", "Proposed")):
+                    st.toast("Agent đã ghi nhớ điều này cho các lần sau", icon=":material/psychology:")
+
             elif event["type"] == "content":
                 answer_text += data["text"]
                 answer_slot.markdown(answer_text)
@@ -199,6 +208,24 @@ def render_agent_stream(
     except Exception as e:
         status.update(label="Agent gặp lỗi", state="error")
         state_manager.chat_error = str(e)
+
+
+def on_rate(
+        actions: UIActions,
+        rating: int,
+):
+    """👍 gửi ngay; 👎 mở dialog để user nói rõ sai ở đâu (không nhập gì vẫn gửi được)"""
+    if rating == -1:
+        feedback_dialog(actions, rating=-1)
+        return
+
+    try:
+        actions.send_feedback("", rating=1)
+        st.toast("Cảm ơn bạn đã đánh giá!", icon=":material/thumb_up:")
+    except UnauthorizedError:
+        raise
+    except Exception:
+        st.toast("Gửi đánh giá thất bại.", icon=":material/error:")
 
 
 def render_feedback_button(

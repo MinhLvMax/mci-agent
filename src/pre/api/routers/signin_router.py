@@ -22,6 +22,7 @@ class SigninResponse(BaseModel):
     email: str
     access_token: str  # Token client dùng cho các request sau
     token_type: str = "bearer"  # Báo client gửi token theo dạng "Authorization: Bearer <token>"
+    role: str = 'user'  # 'user' | 'admin'
 
 
 signin_router = APIRouter(
@@ -64,7 +65,8 @@ def signin(
         return SigninResponse(
             id=user.user_id,
             email=user.email,
-            access_token=user.access_token  # Gửi token về cho client
+            access_token=user.access_token,  # Gửi token về cho client
+            role=user.role
         )
 
     except InactiveAccountError as e:  # Đúng mật khẩu nhưng chưa được duyệt

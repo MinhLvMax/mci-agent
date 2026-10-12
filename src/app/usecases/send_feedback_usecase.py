@@ -7,6 +7,8 @@ class SendFeedbackUseCaseCommand:
     user_id: int
     conversation_id: int | None
     content: str
+    rating: int | None = None  # 1 = hài lòng, -1 = chưa hài lòng
+    kind: str | None = None  # 'correction' | 'preference' | 'bug' | 'other'
 
 
 @dataclass
@@ -22,7 +24,9 @@ class SendFeedbackUsecase:
         feedback = self.feedback_repository.create(
             user_id=command.user_id,
             conversation_id=command.conversation_id,
-            content=command.content
+            content=command.content,
+            rating=command.rating,
+            kind=command.kind
         )
 
         return SendFeedbackUseCaseResult(

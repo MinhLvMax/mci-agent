@@ -19,6 +19,7 @@ class SigninUserResult:
     user_id: int
     email: str
     access_token: str  # JWT client phải gửi kèm ở mọi request sau khi đăng nhập
+    role: str = 'user'  # UI dùng để hiện nút Quản trị, quyền thật vẫn do backend kiểm tra
 
 
 class SigninUseCase:
@@ -74,5 +75,6 @@ class SigninUseCase:
         return SigninUserResult(
             user_id=user.id,
             email=user.email,
-            access_token=access_token  # Trả token để router gửi về client
+            access_token=access_token,  # Trả token để router gửi về client
+            role=user.role
         )

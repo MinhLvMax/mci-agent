@@ -15,10 +15,13 @@ from src.app.services.postgre_db.postgre_files_repository import (
     PostgreFilesRepository
 )
 from src.app.services.postgre_db.postgre_skills_repository import PostgreSkillsRepository
+from src.app.services.postgre_db.postgre_memories_repository import PostgreMemoriesRepository
+from src.app.services.memory_service import MemoryService
 from src.app.services.system_prompt_builder import build_system_prompt
 from src.app.services.workspace_sync_service import WorkspaceSyncService
 
 from src.app.usecases.chat_usecase import ChatUseCase, ChatUseCaseCommand
+from src.app.usecases.extract_lessons_usecase import ExtractLessonsUseCaseCommand
 from src.app.usecases.conversation_management_usecases.generate_title_usecase import (
     DEFAULT_CONVERSATION_TITLE,
     GenerateTitleUsecase,
@@ -27,6 +30,7 @@ from src.app.usecases.conversation_management_usecases.generate_title_usecase im
 from src.dom.entities.message import Message
 from src.dom.agent_event import AgentEvent
 from src.bootstrap import build_agent_service, build_title_reasoner, build_workspace_service
+from src.pre.api.lesson_runner import extract_lessons_in_background, last_content
 from src.config import Config
 
 
@@ -67,14 +71,23 @@ def chat(
             conversation_id=conversation.id,
         )
 
-        # Đọc skill mỗi lượt chat để admin sửa trong DB là có hiệu lực ngay
+        # Đọc skill và memory mỗi lượt chat để admin sửa/duyệt trong DB là có hiệu lực ngay
         skills = PostgreSkillsRepository(connection).list_active()
+        memories_repository = PostgreMemoriesRepository(connection)
+        memories = memories_repository.list_for_prompt(user_id)
 
         mess_repository = PostgreMessegesRepository(connection)
+        history = mess_repository.get_messages(conversation_id=conversation.id)
         usecase = ChatUseCase(
-            agent=build_agent_service(conversation_workspace_dir, skills),
+            agent=build_agent_service(
+                conversation_workspace_dir,
+                skills,
+                memory_service=MemoryService(memories_repository),
+                user_id=user_id,
+                conversation_id=conversation.id,
+            ),
             conversation_repository=mess_repository,
-            system_prompt=build_system_prompt(skills),
+            system_prompt=build_system_prompt(skills, memories),
         )
         try:
             result = usecase.execute(
@@ -109,6 +122,14 @@ def chat(
                 conversation_id=conversation.id,
                 workspace_dir=conversation_workspace_dir,
             )
+        extract_lessons_in_background(ExtractLessonsUseCaseCommand(
+            user_id=user_id,
+            conversation_id=conversation.id,
+            user_message=request.new_message,
+            previous_assistant_reply=last_content(history, 'assistant'),
+            assistant_reply=result.message.content,
+        ))
+
         return ChatResponse(
             message=result.message.content
         )
@@ -148,19 +169,28 @@ def chat_stream(
         # Connection phải sống tới khi stream xong nên mọi thứ nằm trong generator
         try:
             skills = PostgreSkillsRepository(connection).list_active()
+            memories_repository = PostgreMemoriesRepository(connection)
+            memories = memories_repository.list_for_prompt(user_id)
             messages_repository = PostgreMessegesRepository(connection)
+            history = messages_repository.get_messages(conversation_id=conversation.id)
 
             # Lượt đầu của hội thoại còn mang tên tạm thì AI đặt tên sau khi trả lời xong.
             # User đã tự đổi tên thì không ghi đè.
             should_generate_title = (
                     conversation.title == DEFAULT_CONVERSATION_TITLE
-                    and not messages_repository.get_messages(conversation_id=conversation.id)
+                    and not history
             )
 
             usecase = ChatUseCase(
-                agent=build_agent_service(conversation_workspace_dir, skills),
+                agent=build_agent_service(
+                    conversation_workspace_dir,
+                    skills,
+                    memory_service=MemoryService(memories_repository),
+                    user_id=user_id,
+                    conversation_id=conversation.id,
+                ),
                 conversation_repository=messages_repository,
-                system_prompt=build_system_prompt(skills),
+                system_prompt=build_system_prompt(skills, memories),
             )
             try:
                 assistant_reply = None
@@ -176,6 +206,16 @@ def chat_stream(
                     if event.type == 'done':
                         assistant_reply = event.data["content"]
                     yield json.dumps(event.to_dict(), ensure_ascii=False) + "\n"
+
+                if assistant_reply is not None:
+                    # Rút bài học ở thread riêng, model tự quyết lượt này có gì đáng nhớ không
+                    extract_lessons_in_background(ExtractLessonsUseCaseCommand(
+                        user_id=user_id,
+                        conversation_id=conversation.id,
+                        user_message=request.new_message,
+                        previous_assistant_reply=last_content(history, 'assistant'),
+                        assistant_reply=assistant_reply,
+                    ))
 
                 if should_generate_title and assistant_reply is not None:
                     title_event = _generate_title(connection, conversation.id, request.new_message, assistant_reply)

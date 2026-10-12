@@ -14,6 +14,9 @@ from src.pre.api.routers.files.list_files_router import list_files_router
 from src.pre.api.routers.files.download_file_router import download_file_router
 from src.pre.api.routers.files.upload_file_router import upload_file_router
 from src.pre.api.routers.feedback_router import feedback_router
+from src.pre.api.routers.memories_router import memories_router
+from src.pre.api.routers.admin_users_router import admin_users_router
+from src.pre.api.routers.admin_skills_router import admin_skills_router
 
 app = FastAPI()
 
@@ -32,6 +35,9 @@ app.include_router(list_files_router)
 app.include_router(download_file_router)
 app.include_router(upload_file_router)
 app.include_router(feedback_router)
+app.include_router(memories_router)
+app.include_router(admin_users_router)
+app.include_router(admin_skills_router)
 
 # Lệnh chạy
 # uvicorn src.pre.api.main:app --reload

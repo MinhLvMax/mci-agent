@@ -14,7 +14,9 @@ class PostgreFeedbacksRepository:
             self,
             user_id: int,
             conversation_id: int | None,
-            content: str
+            content: str,
+            rating: int | None = None,
+            kind: str | None = None,
     ) -> Feedback:
 
         with self.connection.cursor() as cursor:
@@ -23,9 +25,13 @@ class PostgreFeedbacksRepository:
                 INSERT INTO feedbacks(
                     user_id,
                     conversation_id,
-                    content
+                    content,
+                    rating,
+                    kind
                 )
                 VALUES(
+                    %s,
+                    %s,
                     %s,
                     %s,
                     %s
@@ -34,12 +40,16 @@ class PostgreFeedbacksRepository:
                     id,
                     user_id,
                     conversation_id,
-                    content
+                    content,
+                    rating,
+                    kind
                 """,
                 (
                     user_id,
                     conversation_id,
-                    content
+                    content,
+                    rating,
+                    kind
                 )
             )
 
@@ -51,5 +61,17 @@ class PostgreFeedbacksRepository:
             id=row[0],
             user_id=row[1],
             conversation_id=row[2],
-            content=row[3]
+            content=row[3],
+            rating=row[4],
+            kind=row[5]
         )
+
+    def mark_processed(self, feedback_id: int):
+        '''Đánh dấu extractor đã đọc góp ý này'''
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE feedbacks SET processed_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (feedback_id,)
+            )
+
+        self.connection.commit()

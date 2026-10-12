@@ -21,7 +21,8 @@ class UIActions:
         response = self.api.signin_api.signin(email, password)
         self.state.user = StateManager.User(
             user_id=response.id,
-            email=response.email
+            email=response.email,
+            role=response.role
         )
         self.state.access_token = response.access_token  # Lưu token để các lần rerun sau dùng lại
         self.api.client.access_token = response.access_token  # Gắn ngay vào client cho các request còn lại của lượt chạy này
@@ -210,18 +211,63 @@ class UIActions:
 
         return True
 
-    def send_feedback(self, content: str):
+    def send_feedback(self, content: str, rating: int | None = None, kind: str | None = None):
         """
         Gửi góp ý của user.
 
         Tự gắn hội thoại đang mở (nếu có) để biết góp ý thuộc ngữ cảnh nào,
-        user không phải chọn gì thêm.
+        user không phải chọn gì thêm. Backend đọc góp ý để agent rút kinh nghiệm.
         """
 
         self.api.feedback_api.send(
             content=content,
             conversation_id=self.state.current_conversation_id,
+            rating=rating,
+            kind=kind,
         )
+
+    def list_my_memories(self):
+        return self.api.memory_api.list_mine()
+
+    def is_admin(self) -> bool:
+        return self.api.memory_api.is_admin()
+
+    def list_org_memories(self, status: str | None = None):
+        return self.api.memory_api.list_org(status)
+
+    def create_org_memory(self, content: str):
+        return self.api.memory_api.create_org(content)
+
+    def approve_memory(self, memory_id: int):
+        return self.api.memory_api.approve(memory_id)
+
+    def reject_memory(self, memory_id: int):
+        return self.api.memory_api.reject(memory_id)
+
+    def update_memory(self, memory_id: int, content: str):
+        return self.api.memory_api.update(memory_id, content)
+
+    def delete_memory(self, memory_id: int):
+        self.api.memory_api.delete(memory_id)
+
+    # ===== Trang quản trị (backend tự chặn nếu không phải admin) =====
+    def admin_list_users(self):
+        return self.api.admin_api.list_users()
+
+    def admin_update_user(self, user_id: int, **changes):
+        return self.api.admin_api.update_user(user_id, **changes)
+
+    def admin_reset_password(self, user_id: int, new_password: str):
+        self.api.admin_api.reset_password(user_id, new_password)
+
+    def admin_list_skills(self):
+        return self.api.admin_api.list_skills()
+
+    def admin_create_skill(self, **fields):
+        return self.api.admin_api.create_skill(**fields)
+
+    def admin_update_skill(self, skill_id: int, **changes):
+        return self.api.admin_api.update_skill(skill_id, **changes)
 
     def list_files(
             self,

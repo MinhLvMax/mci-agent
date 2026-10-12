@@ -67,6 +67,119 @@ class PostgresUsersRepository:
 
         return user
 
+    def get_user_by_id(
+            self,
+            user_id: int
+    ) -> User | None:
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    email,
+                    password_hash,
+                    is_active,
+                    role
+                FROM users
+                WHERE id = %s
+                """,
+                (user_id,)
+            )
+
+            row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return User(
+            id=row[0],
+            email=row[1],
+            password_hash=row[2],
+            is_active=row[3],
+            role=row[4]
+        )
+
+    def list_all(self) -> list[User]:
+        '''Toàn bộ user cho trang quản trị, tài khoản chờ duyệt đứng đầu'''
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    email,
+                    password_hash,
+                    is_active,
+                    role,
+                    created_at
+                FROM users
+                ORDER BY is_active ASC, created_at DESC
+                """
+            )
+
+            rows = cursor.fetchall()
+
+        return [
+            User(
+                id=row[0],
+                email=row[1],
+                password_hash=row[2],
+                is_active=row[3],
+                role=row[4],
+                created_at=row[5],
+            )
+            for row in rows
+        ]
+
+    def update(
+            self,
+            user_id: int,
+            email: str | None = None,
+            role: str | None = None,
+            is_active: bool | None = None,
+    ) -> User | None:
+        '''Chỉ ghi các cột được truyền vào (khác None)'''
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE users
+                SET email = COALESCE(%s, email),
+                    role = COALESCE(%s, role),
+                    is_active = COALESCE(%s, is_active),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                RETURNING id
+                """,
+                (email, role, is_active, user_id)
+            )
+
+            row = cursor.fetchone()
+
+        self.connection.commit()
+
+        return self.get_user_by_id(row[0]) if row else None
+
+    def set_password_hash(
+            self,
+            user_id: int,
+            password_hash: str
+    ):
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE users
+                SET password_hash = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (password_hash, user_id)
+            )
+
+        self.connection.commit()
+
+    def count_active_admins(self) -> int:
+        with self.connection.cursor() as cursor:
+            cursor.execute("SELECT count(*) FROM users WHERE role = 'admin' AND is_active")
+            return cursor.fetchone()[0]
+
     def get_all(self) -> list[User]:
 
         with self.connection.cursor() as cursor:
