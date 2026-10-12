@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
+from src.app.ports.repositories import ConversationsRepository
 
 
 @dataclass
@@ -17,7 +17,7 @@ class NewConversationUseCaseResult:
 
 
 class NewConversationUsecase:
-    def __init__(self, conversation_repository: PostgreConversationsRepository):
+    def __init__(self, conversation_repository: ConversationsRepository):
         self.conversation_repository = conversation_repository
 
     def execute(self, command: NewConversationUseCaseCommand) -> NewConversationUseCaseResult:

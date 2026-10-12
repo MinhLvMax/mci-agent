@@ -1,4 +1,4 @@
-# src/app/services/postgre_db/postgre_files_repository.py
+# src/inf/persistence/postgres/postgre_files_repository.py
 
 import psycopg
 

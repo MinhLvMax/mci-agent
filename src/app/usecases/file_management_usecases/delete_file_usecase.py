@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from src.app.ports.repositories import FilesRepository
+from src.app.ports.storage import FileStorage
+
 
 @dataclass
 class DeleteFileCommand:
@@ -30,8 +33,8 @@ class DeleteFileUseCase:
 
     def __init__(
             self,
-            files_repository,
-            file_storage,
+            files_repository: FilesRepository,
+            file_storage: FileStorage,
     ):
         # Repository chịu trách nhiệm thao tác metadata
         # của file trong PostgreSQL.

@@ -1,6 +1,7 @@
 import psycopg
 from psycopg.types.json import Jsonb
 from src.dom.entities.skill import Skill
+from src.inf.persistence.postgres.errors import translate_unique_violation
 
 _COLUMNS = """
     id,
@@ -89,7 +90,10 @@ class PostgreSkillsRepository:
         return _to_skill(row) if row else None
 
     def create(self, skill: Skill) -> Skill:
-        with self.connection.cursor() as cursor:
+        with (
+                translate_unique_violation(self.connection, "Skill name already exists"),
+                self.connection.cursor() as cursor,
+        ):
             cursor.execute(
                 f"""
                 INSERT INTO skills(name, description, instructions, always_on, config_json, is_active, sort_order)
@@ -113,7 +117,10 @@ class PostgreSkillsRepository:
 
     def update(self, skill: Skill) -> Skill | None:
         '''Ghi đè toàn bộ các trường của skill có id tương ứng'''
-        with self.connection.cursor() as cursor:
+        with (
+                translate_unique_violation(self.connection, "Skill name already exists"),
+                self.connection.cursor() as cursor,
+        ):
             cursor.execute(
                 f"""
                 UPDATE skills
@@ -146,7 +153,7 @@ class PostgreSkillsRepository:
 
 
 if __name__ == '__main__':
-    from src.app.services.postgre_db import create_postgres_connection
+    from src.inf.persistence.postgres import create_postgres_connection
 
     conn = create_postgres_connection()
     try:

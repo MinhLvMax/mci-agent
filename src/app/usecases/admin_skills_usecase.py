@@ -1,9 +1,8 @@
 import re
 from dataclasses import dataclass, fields, replace
 
-import psycopg
-
-from src.app.services.postgre_db.postgre_skills_repository import PostgreSkillsRepository
+from src.app.ports.errors import DuplicateRecordError
+from src.app.ports.repositories import SkillsRepository
 from src.dom.entities.skill import Skill
 
 # Tên skill là slug: agent gọi load_skill bằng đúng tên này, vd "nghien-cuu-dia-danh"
@@ -37,7 +36,7 @@ class SkillChanges:
 class AdminSkillsUsecase:
     '''Nghiệp vụ trang quản trị skill: thêm, sửa, bật/tắt (bật = duyệt cho agent dùng)'''
 
-    def __init__(self, skills_repository: PostgreSkillsRepository):
+    def __init__(self, skills_repository: SkillsRepository):
         self.skills_repository = skills_repository
 
     def list_skills(self) -> list[Skill]:
@@ -72,8 +71,7 @@ class AdminSkillsUsecase:
     def _save(self, save, skill: Skill) -> Skill:
         try:
             return save(skill)
-        except psycopg.errors.UniqueViolation:
-            self.skills_repository.connection.rollback()
+        except DuplicateRecordError:
             raise SkillNameExistsError(f"Skill name '{skill.name}' already exists")
 
 

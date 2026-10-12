@@ -1,17 +1,10 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_files_repository import (
-    PostgreFilesRepository
-)
-from src.app.services.postgre_db.postgre_conversations_repository import (
-    PostgreConversationsRepository
-)
 from src.app.services.workspace_sync_service import WorkspaceSyncService
-from src.bootstrap import build_workspace_service
 from src.app.usecases.file_management_usecases.list_files_usecase import (
     ListFilesUseCase,
     ListFilesCommand,
@@ -64,35 +57,33 @@ list_files_router = APIRouter(
 def list_files(
         request: ListFilesRequest,
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token
+        container: ApiContainer = Depends(get_container),
 ) -> ListFilesResponse:
 
-    # Mỗi request tạo một PostgreSQL connection.
-    connection = create_postgres_connection()
-
-    try:
+    # Mỗi request mở một phiên CSDL, ra khỏi "with" là tự đóng.
+    with container.unit_of_work() as uow:
         conversation = get_owned_conversation(  # Chỉ cho xem file trong conversation của chính mình
-            PostgreConversationsRepository(connection),
+            uow.conversations,
             conversation_id=request.conversation_id,
             user_id=user_id,
         )
 
         # Repository chịu trách nhiệm truy vấn bảng files.
-        repository = PostgreFilesRepository(
-            connection=connection
-        )
+        repository = uow.files
 
         # Filesystem là nguồn sự thật, nên đồng bộ metadata trước khi list.
         #
         # Nếu chỉ sync ở cuối request /chat/ thì khi request đó bị lỗi
         # hoặc bị ngắt giữa chừng, file Agent đã tạo sẽ không bao giờ
         # xuất hiện trong DB và trên giao diện.
-        workspace_dir = build_workspace_service().get_conversation_workspace(
+        workspace_dir = container.workspace_service().get_conversation_workspace(
             user_id=conversation.user_id,
             conversation_id=conversation.id,
         )
 
         WorkspaceSyncService(
-            files_repository=repository
+            files_repository=repository,
+            scanner=container.workspace_scanner(),
         ).sync(
             conversation_id=conversation.id,
             workspace_dir=workspace_dir,
@@ -114,7 +105,3 @@ def list_files(
         return ListFilesResponse(
             files=result.files
         )
-
-    finally:
-        # Luôn đóng connection dù use case thành công hay lỗi.
-        connection.close()

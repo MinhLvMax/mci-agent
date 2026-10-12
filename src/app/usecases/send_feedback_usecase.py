@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_feedbacks_repository import PostgreFeedbacksRepository
+from src.app.ports.repositories import FeedbacksRepository
 
 
 @dataclass
@@ -17,7 +17,7 @@ class SendFeedbackUseCaseResult:
 
 
 class SendFeedbackUsecase:
-    def __init__(self, feedback_repository: PostgreFeedbacksRepository):
+    def __init__(self, feedback_repository: FeedbacksRepository):
         self.feedback_repository = feedback_repository
 
     def execute(self, command: SendFeedbackUseCaseCommand) -> SendFeedbackUseCaseResult:

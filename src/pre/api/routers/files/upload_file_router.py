@@ -1,25 +1,17 @@
 from fastapi import APIRouter, Depends, File as FormFile, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
-from src.app.services.file_storage import FileStorage
 from src.app.services.workspace_sync_service import WorkspaceSyncService
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_files_repository import (
-    PostgreFilesRepository
-)
-from src.app.services.postgre_db.postgre_conversations_repository import (
-    PostgreConversationsRepository
-)
 
 from src.app.usecases.file_management_usecases.upload_file_usecase import (
     UploadFileUseCase,
     UploadFileCommand,
 )
 
-from src.bootstrap import build_workspace_service
 from src.dom.entities.file import File
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # Giới hạn 50 MB cho mỗi file
@@ -68,31 +60,29 @@ def upload_file(  # Dùng def thường để FastAPI chạy trong threadpool, k
         conversation_id: int = Form(),  # Gửi dạng form field vì request là multipart
         file: UploadFile = FormFile(),  # File người dùng chọn
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token
+        container: ApiContainer = Depends(get_container),
 ) -> UploadFileResponse:
     content = _read_limited(file)  # Kiểm tra dung lượng trước khi đụng tới DB hay ổ đĩa
 
-    connection = create_postgres_connection()
-
-    try:
+    with container.unit_of_work() as uow:
         conversation = get_owned_conversation(  # Chỉ cho upload vào conversation của chính mình
-            PostgreConversationsRepository(connection),
+            uow.conversations,
             conversation_id=conversation_id,
             user_id=user_id,
         )
 
-        workspace_dir = build_workspace_service().get_conversation_workspace(  # Thư mục vật lý của conversation
+        workspace_dir = container.workspace_service().get_conversation_workspace(  # Thư mục vật lý của conversation
             user_id=conversation.user_id,
             conversation_id=conversation.id,
         )
 
-        files_repository = PostgreFilesRepository(
-            connection=connection
-        )
+        files_repository = uow.files
 
         # Đồng bộ trước để metadata cũ khớp với ổ đĩa,
         # tránh trùng unique (conversation_id, path) với bản ghi đã lỗi thời.
         WorkspaceSyncService(
-            files_repository=files_repository
+            files_repository=files_repository,
+            scanner=container.workspace_scanner(),
         ).sync(
             conversation_id=conversation.id,
             workspace_dir=workspace_dir,
@@ -100,9 +90,7 @@ def upload_file(  # Dùng def thường để FastAPI chạy trong threadpool, k
 
         usecase = UploadFileUseCase(
             files_repository=files_repository,
-            file_storage=FileStorage(
-                workspace_root=workspace_dir  # FileStorage chỉ được ghi trong workspace này
-            ),
+            file_storage=container.file_storage(workspace_dir),
         )
 
         try:
@@ -124,5 +112,3 @@ def upload_file(  # Dùng def thường để FastAPI chạy trong threadpool, k
             file=result.file
         )
 
-    finally:
-        connection.close()

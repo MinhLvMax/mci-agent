@@ -4,18 +4,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
-from src.app.services.postgre_db.postgre_conversations_repository import (
-    PostgreConversationsRepository
-)
-from src.app.services.postgre_db.postgre_files_repository import (
-    PostgreFilesRepository
-)
-from src.app.services.postgre_db.postgre_skills_repository import PostgreSkillsRepository
-from src.app.services.postgre_db.postgre_memories_repository import PostgreMemoriesRepository
+from src.app.ports.unit_of_work import UnitOfWork
 from src.app.services.memory_service import MemoryService
 from src.app.services.system_prompt_builder import build_system_prompt
 from src.app.services.workspace_sync_service import WorkspaceSyncService
@@ -29,7 +21,6 @@ from src.app.usecases.conversation_management_usecases.generate_title_usecase im
 )
 from src.dom.entities.message import Message
 from src.dom.agent_event import AgentEvent
-from src.bootstrap import build_agent_service, build_title_reasoner, build_workspace_service
 from src.pre.api.lesson_runner import extract_lessons_in_background, last_content
 from src.config import Config
 
@@ -55,38 +46,34 @@ chat_router = APIRouter(
 def chat(
         request: ChatRequest,
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token, không phải client tự khai
+        container: ApiContainer = Depends(get_container),
 ) -> ChatResponse:
-    connection = create_postgres_connection()
-    try:
+    with container.unit_of_work() as uow:
         conversation = get_owned_conversation(  # Chỉ cho chat trong conversation của chính mình
-            PostgreConversationsRepository(connection),
+            uow.conversations,
             conversation_id=request.conversation_id,
             user_id=user_id,
         )
 
-        workspace_service = build_workspace_service()
-
-        conversation_workspace_dir = workspace_service.get_conversation_workspace(
+        conversation_workspace_dir = container.workspace_service().get_conversation_workspace(
             user_id=conversation.user_id,
             conversation_id=conversation.id,
         )
 
         # Đọc skill và memory mỗi lượt chat để admin sửa/duyệt trong DB là có hiệu lực ngay
-        skills = PostgreSkillsRepository(connection).list_active()
-        memories_repository = PostgreMemoriesRepository(connection)
-        memories = memories_repository.list_for_prompt(user_id)
+        skills = uow.skills.list_active()
+        memories = uow.memories.list_for_prompt(user_id)
 
-        mess_repository = PostgreMessegesRepository(connection)
-        history = mess_repository.get_messages(conversation_id=conversation.id)
+        history = uow.messages.get_messages(conversation_id=conversation.id)
         usecase = ChatUseCase(
-            agent=build_agent_service(
+            agent=container.agent_service(
                 conversation_workspace_dir,
                 skills,
-                memory_service=MemoryService(memories_repository),
+                memory_service=MemoryService(uow.memories),
                 user_id=user_id,
                 conversation_id=conversation.id,
             ),
-            conversation_repository=mess_repository,
+            conversation_repository=uow.messages,
             system_prompt=build_system_prompt(skills, memories),
         )
         try:
@@ -101,40 +88,34 @@ def chat(
             )
         finally:
             # ============================================================
-            # 5. Agent đã chạy xong (kể cả khi chạy lỗi giữa chừng)
+            # Agent đã chạy xong (kể cả khi chạy lỗi giữa chừng)
             #    -> filesystem có thể đã thay đổi
             #    -> đồng bộ lại metadata vào DB
             # ============================================================
 
             # Nếu usecase lỗi ở bước ghi DB thì transaction đang hỏng,
-            # phải rollback trước khi dùng tiếp connection.
-            connection.rollback()
+            # phải rollback trước khi dùng tiếp phiên.
+            uow.rollback()
 
-            files_repository = PostgreFilesRepository(
-                connection=connection
-            )
-
-            workspace_sync_service = WorkspaceSyncService(
-                files_repository=files_repository
-            )
-
-            workspace_sync_service.sync(
+            WorkspaceSyncService(
+                files_repository=uow.files,
+                scanner=container.workspace_scanner(),
+            ).sync(
                 conversation_id=conversation.id,
                 workspace_dir=conversation_workspace_dir,
             )
-        extract_lessons_in_background(ExtractLessonsUseCaseCommand(
-            user_id=user_id,
-            conversation_id=conversation.id,
-            user_message=request.new_message,
-            previous_assistant_reply=last_content(history, 'assistant'),
-            assistant_reply=result.message.content,
-        ))
 
-        return ChatResponse(
-            message=result.message.content
-        )
-    finally:
-        connection.close()
+    extract_lessons_in_background(container, ExtractLessonsUseCaseCommand(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        user_message=request.new_message,
+        previous_assistant_reply=last_content(history, 'assistant'),
+        assistant_reply=result.message.content,
+    ))
+
+    return ChatResponse(
+        message=result.message.content
+    )
 
 
 @chat_router.post(
@@ -143,36 +124,31 @@ def chat(
 def chat_stream(
         request: ChatRequest,
         user_id: int = Depends(get_current_user_id),
+        container: ApiContainer = Depends(get_container),
 ) -> StreamingResponse:
     '''
     Giống /chat/ nhưng trả về dần từng event của agent, mỗi dòng là một JSON (NDJSON).
     Dòng cuối là {"type": "done", ...} hoặc {"type": "error", ...}.
     '''
-    connection = create_postgres_connection()
-    try:
-        # Kiểm tra quyền trước khi stream để lỗi 403/404 vẫn trả về đúng status code
+    # Kiểm tra quyền trước khi stream để lỗi 403/404 vẫn trả về đúng status code
+    with container.unit_of_work() as uow:
         conversation = get_owned_conversation(
-            PostgreConversationsRepository(connection),
+            uow.conversations,
             conversation_id=request.conversation_id,
             user_id=user_id,
         )
-    except Exception:
-        connection.close()
-        raise
 
-    conversation_workspace_dir = build_workspace_service().get_conversation_workspace(
+    conversation_workspace_dir = container.workspace_service().get_conversation_workspace(
         user_id=conversation.user_id,
         conversation_id=conversation.id,
     )
 
     def event_lines():
-        # Connection phải sống tới khi stream xong nên mọi thứ nằm trong generator
-        try:
-            skills = PostgreSkillsRepository(connection).list_active()
-            memories_repository = PostgreMemoriesRepository(connection)
-            memories = memories_repository.list_for_prompt(user_id)
-            messages_repository = PostgreMessegesRepository(connection)
-            history = messages_repository.get_messages(conversation_id=conversation.id)
+        # Phiên CSDL phải sống tới khi stream xong nên mở trong generator
+        with container.unit_of_work() as uow:
+            skills = uow.skills.list_active()
+            memories = uow.memories.list_for_prompt(user_id)
+            history = uow.messages.get_messages(conversation_id=conversation.id)
 
             # Lượt đầu của hội thoại còn mang tên tạm thì AI đặt tên sau khi trả lời xong.
             # User đã tự đổi tên thì không ghi đè.
@@ -182,14 +158,14 @@ def chat_stream(
             )
 
             usecase = ChatUseCase(
-                agent=build_agent_service(
+                agent=container.agent_service(
                     conversation_workspace_dir,
                     skills,
-                    memory_service=MemoryService(memories_repository),
+                    memory_service=MemoryService(uow.memories),
                     user_id=user_id,
                     conversation_id=conversation.id,
                 ),
-                conversation_repository=messages_repository,
+                conversation_repository=uow.messages,
                 system_prompt=build_system_prompt(skills, memories),
             )
             try:
@@ -209,7 +185,7 @@ def chat_stream(
 
                 if assistant_reply is not None:
                     # Rút bài học ở thread riêng, model tự quyết lượt này có gì đáng nhớ không
-                    extract_lessons_in_background(ExtractLessonsUseCaseCommand(
+                    extract_lessons_in_background(container, ExtractLessonsUseCaseCommand(
                         user_id=user_id,
                         conversation_id=conversation.id,
                         user_message=request.new_message,
@@ -218,7 +194,7 @@ def chat_stream(
                     ))
 
                 if should_generate_title and assistant_reply is not None:
-                    title_event = _generate_title(connection, conversation.id, request.new_message, assistant_reply)
+                    title_event = _generate_title(container, uow, conversation.id, request.new_message, assistant_reply)
                     if title_event is not None:
                         yield json.dumps(title_event.to_dict(), ensure_ascii=False) + "\n"
             except Exception as e:
@@ -230,15 +206,14 @@ def chat_stream(
                 ) + "\n"
             finally:
                 # Agent có thể đã đổi file trong workspace -> đồng bộ lại metadata như /chat/
-                connection.rollback()
+                uow.rollback()
                 WorkspaceSyncService(
-                    files_repository=PostgreFilesRepository(connection=connection)
+                    files_repository=uow.files,
+                    scanner=container.workspace_scanner(),
                 ).sync(
                     conversation_id=conversation.id,
                     workspace_dir=conversation_workspace_dir,
                 )
-        finally:
-            connection.close()
 
     return StreamingResponse(
         event_lines(),
@@ -247,7 +222,8 @@ def chat_stream(
 
 
 def _generate_title(
-        connection,
+        container: ApiContainer,
+        uow: UnitOfWork,
         conversation_id: int,
         user_message: str,
         assistant_reply: str,
@@ -258,8 +234,8 @@ def _generate_title(
     '''
     try:
         title = GenerateTitleUsecase(
-            reasoner=build_title_reasoner(),
-            conversation_repository=PostgreConversationsRepository(connection),
+            reasoner=container.title_reasoner(),
+            conversation_repository=uow.conversations,
         ).execute(
             GenerateTitleUseCaseCommand(
                 conversation_id=conversation_id,
@@ -269,7 +245,7 @@ def _generate_title(
         )
     except Exception:
         Config.logger.exception('Save conversation title failed')
-        connection.rollback()  # Transaction hỏng thì rollback để bước sync workspace phía sau còn dùng được
+        uow.rollback()  # Transaction hỏng thì rollback để bước sync workspace phía sau còn dùng được
         return None
 
     return AgentEvent(type='title', data={"title": title})

@@ -13,6 +13,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY .streamlit ./.streamlit
 COPY src ./src
-COPY main.py .
 
 # Lệnh chạy cụ thể (api hay ui) được khai báo trong docker-compose.yml

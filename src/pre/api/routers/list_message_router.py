@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.list_messege_usecase import ListMessegeUsecase, ListMessegeUseCaseCommand
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
 from src.dom.entities.message import Message
@@ -29,16 +27,16 @@ list_message_router = APIRouter(
 def list_messages(
         request: ListMessageRequest,
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token
+        container: ApiContainer = Depends(get_container),
 ) -> ListMessageResponse:
-    connection = create_postgres_connection()
-    try:
+    with container.unit_of_work() as uow:
         get_owned_conversation(  # Chặn đọc tin nhắn của conversation người khác
-            PostgreConversationsRepository(connection),
+            uow.conversations,
             conversation_id=request.conversation_id,
             user_id=user_id,
         )
 
-        repository = PostgreMessegesRepository(connection)
+        repository = uow.messages
         usecase = ListMessegeUsecase(
             message_repository=repository
         )
@@ -50,5 +48,3 @@ def list_messages(
         return ListMessageResponse(
             messages=result.messages
         )
-    finally:
-        connection.close()

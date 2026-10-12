@@ -1,4 +1,16 @@
-import streamlit as st
+"""
+Entrypoint của giao diện web (Streamlit). Giao diện chỉ gọi backend qua HTTP nên không cần bootstrap.
+
+Lệnh chạy (từ thư mục gốc dự án):
+    streamlit run src/entries_point/web_ui.py --server.runOnSave true
+"""
+import sys
+from pathlib import Path
+
+# Streamlit chạy file này như một script nên thư mục gốc dự án chưa nằm trong sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import streamlit as st  # noqa: E402
 
 from src.pre.streamlit_ui.root_layout import root_layout
 from src.pre.streamlit_ui.actions import UIActions
@@ -25,4 +37,3 @@ except UnauthorizedError as e:  # Bất kỳ API nào báo token hết hạn ho�
     state.logout()  # Xóa phiên cũ để quay về màn hình đăng nhập
     state.auth_notice = str(e)  # Giữ lại lý do để hiện cho user biết
     st.rerun()  # Vẽ lại trang, lúc này sẽ là form đăng nhập
-# Lệnh chạy: streamlit run main.py --server.runOnSave true

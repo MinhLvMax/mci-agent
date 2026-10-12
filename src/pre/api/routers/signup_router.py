@@ -1,8 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
+from src.pre.api.container import ApiContainer, get_container
 
 from src.app.usecases.signup_usecase import (
     SignupUseCase,
@@ -34,15 +33,15 @@ signup_router = APIRouter(
     status_code=201,  # 201 = đã tạo tài nguyên mới
 )
 def signup(
-        request: SignupRequest
+        request: SignupRequest,
+        container: ApiContainer = Depends(get_container),
 ) -> SignupResponse:
     # Router công khai: chưa có tài khoản thì chưa có token, nên không gắn get_current_user_id
 
-    connection = create_postgres_connection()
-
-    try:
+    with container.unit_of_work() as uow:
         usecase = SignupUseCase(
-            PostgresUsersRepository(connection)
+            uow.users,
+            password_hasher=container.password_hasher(),
         )
 
         try:
@@ -71,5 +70,3 @@ def signup(
             is_active=result.is_active,
         )
 
-    finally:
-        connection.close()

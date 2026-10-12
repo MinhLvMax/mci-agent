@@ -19,7 +19,7 @@ services:
     build: .
     image: mci-agent:latest
     restart: unless-stopped
-    command: uvicorn src.pre.api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn src.entries_point.api:app --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
       DB_HOST: db
@@ -36,7 +36,7 @@ services:
 #    build: .
     image: mci-agent:latest
     restart: unless-stopped
-    command: streamlit run main.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+    command: streamlit run src/entries_point/web_ui.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
     env_file: .env
     environment:
       API_BASE_URL: http://api:8000  # Streamlit gọi API từ phía server, qua mạng nội bộ Docker

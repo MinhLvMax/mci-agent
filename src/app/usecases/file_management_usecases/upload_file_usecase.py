@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from src.app.ports.repositories import FilesRepository
+from src.app.ports.storage import FileStorage
+
 from src.dom.entities.file import File
 
 
@@ -19,8 +22,8 @@ class UploadFileUseCase:
 
     def __init__(
             self,
-            files_repository,
-            file_storage,
+            files_repository: FilesRepository,
+            file_storage: FileStorage,
     ):
         self.files_repository = files_repository
         self.file_storage = file_storage

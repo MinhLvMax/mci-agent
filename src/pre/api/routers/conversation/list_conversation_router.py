@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
 from src.app.usecases.conversation_management_usecases.list_conversation_usecase import \
     ListConversationUseCaseCommand, ListConversationUsecase
 from src.dom.entities.conversation import Conversation
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id
 
 
@@ -27,10 +26,10 @@ list_conversation_router = APIRouter(
 )
 def list_conversation_controller(
         user_id: int = Depends(get_current_user_id),  # Chỉ liệt kê hội thoại của user trong token
+        container: ApiContainer = Depends(get_container),
 ) -> ListConversationResponse:
-    connection = create_postgres_connection()
-    try:
-        repository = PostgreConversationsRepository(connection)
+    with container.unit_of_work() as uow:
+        repository = uow.conversations
         usecase = ListConversationUsecase(
             conversation_repository=repository
         )
@@ -42,5 +41,3 @@ def list_conversation_controller(
         return ListConversationResponse(
             conversations=result.conversations
         )
-    finally:
-        connection.close()

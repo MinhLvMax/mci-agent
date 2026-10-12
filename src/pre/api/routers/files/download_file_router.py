@@ -5,24 +5,16 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id
 
-from src.app.services.file_storage import FileStorage
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_files_repository import (
-    PostgreFilesRepository
-)
-from src.app.services.postgre_db.postgre_conversations_repository import (
-    PostgreConversationsRepository
-)
 
 from src.app.usecases.file_management_usecases.download_file_usecase import (
     DownloadFileUseCase,
     DownloadFileCommand,
 )
 
-from src.bootstrap import build_workspace_service
 
 
 class DownloadFileRequest(BaseModel):
@@ -41,6 +33,7 @@ download_file_router = APIRouter(
 def download_file(
         request: DownloadFileRequest,
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token
+        container: ApiContainer = Depends(get_container),
 ) -> FileResponse:
     """
     Trả về nguyên bytes của file gốc.
@@ -51,12 +44,8 @@ def download_file(
     - /download_file/ trả file y nguyên, hỗ trợ mọi loại file.
     """
 
-    connection = create_postgres_connection()
-
-    try:
-        files_repository = PostgreFilesRepository(
-            connection=connection
-        )
+    with container.unit_of_work() as uow:
+        files_repository = uow.files
 
         file = files_repository.get_by_id(
             file_id=request.file_id
@@ -68,9 +57,7 @@ def download_file(
                 detail="File not found"
             )
 
-        conversation = PostgreConversationsRepository(
-            connection
-        ).get_by_id(
+        conversation = uow.conversations.get_by_id(
             conversation_id=file.conversation_id
         )
 
@@ -80,16 +67,14 @@ def download_file(
                 detail="File not found"  # Cùng thông báo với file không tồn tại để không lộ thông tin
             )
 
-        workspace_dir = build_workspace_service().get_conversation_workspace(
+        workspace_dir = container.workspace_service().get_conversation_workspace(
             user_id=conversation.user_id,
             conversation_id=conversation.id,
         )
 
         usecase = DownloadFileUseCase(
             files_repository=files_repository,
-            file_storage=FileStorage(
-                workspace_root=workspace_dir
-            ),
+            file_storage=container.file_storage(workspace_dir),
         )
 
         try:
@@ -126,7 +111,3 @@ def download_file(
             ),
         )
 
-    finally:
-        # FileResponse chỉ đọc file khi gửi response,
-        # không dùng connection nên đóng ở đây được.
-        connection.close()

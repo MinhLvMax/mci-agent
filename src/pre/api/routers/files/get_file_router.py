@@ -3,16 +3,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id
 
-from src.app.services.file_storage import FileStorage
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_files_repository import (
-    PostgreFilesRepository
-)
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
-from src.app.services.workspace_service import WorkspaceService
 
 from src.app.usecases.file_management_usecases.get_file_content_usecase import (
     GetFileContentUseCase,
@@ -20,7 +14,6 @@ from src.app.usecases.file_management_usecases.get_file_content_usecase import (
 )
 
 from src.dom.entities.file import File
-from src.config import Config
 
 class GetFileRequest(BaseModel):
     file_id: int
@@ -41,14 +34,11 @@ get_file_router = APIRouter(
 def get_file(
         request: GetFileRequest,
         user_id: int = Depends(get_current_user_id),  # User id lấy từ token
+        container: ApiContainer = Depends(get_container),
 ) -> GetFileResponse:
-    connection = create_postgres_connection()
-
-    try:
+    with container.unit_of_work() as uow:
         # Repository dùng để lấy metadata của file.
-        files_repository = PostgreFilesRepository(
-            connection=connection
-        )
+        files_repository = uow.files
 
         # Call csdl để lấy bản ghi đối tượng file
         file = files_repository.get_by_id(
@@ -63,7 +53,7 @@ def get_file(
             )
 
         # Khai báo repo hội thoại
-        conversation_repository = PostgreConversationsRepository(connection)
+        conversation_repository = uow.conversations
 
         # tìm hội thoại dựa trên id hội thoại nằm trong bản ghi file
         conversation = conversation_repository.get_by_id(
@@ -77,9 +67,7 @@ def get_file(
                 detail="File not found"  # Cùng thông báo với file không tồn tại để không lộ thông tin
             )
 
-        workspace_service = WorkspaceService(
-            workspace_root=Config.AGENT_ROOT_WORKSPACE
-        )
+        workspace_service = container.workspace_service()
 
         workspace_dir = (
             workspace_service.get_conversation_workspace(
@@ -89,9 +77,7 @@ def get_file(
         )
 
         # FileStorage dùng để đọc file vật lý trên server.
-        file_storage = FileStorage(
-            workspace_root=workspace_dir
-        )
+        file_storage = container.file_storage(workspace_dir)
 
         # Use case kết hợp:
         #
@@ -115,5 +101,3 @@ def get_file(
             content=result.content,
         )
 
-    finally:
-        connection.close()

@@ -14,6 +14,7 @@ from src.app.usecases.admin_users_usecase import AdminRuleError, AdminUsersUseca
 from src.app.usecases.signup_usecase import EmailAlreadyExistsError, SignupValidationError
 from src.dom.entities.skill import Skill
 from src.dom.entities.user import User
+from src.inf.security.bcrypt_password_hasher import BcryptPasswordHasher
 
 
 class FakeConnection:
@@ -78,7 +79,7 @@ class AdminUsersUsecaseTest(unittest.TestCase):
             make_user(2, 'b@a.com'),
             make_user(3, 'c@a.com', is_active=False),
         ])
-        self.usecase = AdminUsersUsecase(self.repo)
+        self.usecase = AdminUsersUsecase(self.repo, BcryptPasswordHasher())
 
     def test_activate_and_promote_user(self):
         self.usecase.update_user(UpdateUserCommand(actor_id=1, user_id=3, is_active=True))

@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from src.pre.api.container import ApiContainer
+
 from src.pre.api.routers.signin_router import signin_router
 from src.pre.api.routers.signup_router import signup_router
 from src.pre.api.routers.chat_router import chat_router
@@ -18,26 +20,38 @@ from src.pre.api.routers.memories_router import memories_router
 from src.pre.api.routers.admin_users_router import admin_users_router
 from src.pre.api.routers.admin_skills_router import admin_skills_router
 
-app = FastAPI()
 
-# khai báo ra bao nhiêu router thì đưa hết vào đây
-app.include_router(signin_router)
-app.include_router(signup_router)
-app.include_router(chat_router)
-app.include_router(new_conversation_router)
-app.include_router(delete_conversation_router)
-app.include_router(update_conversation_router)
-app.include_router(list_conversation_router)
-app.include_router(list_message_router)
-app.include_router(delete_file_router)
-app.include_router(get_file_router)
-app.include_router(list_files_router)
-app.include_router(download_file_router)
-app.include_router(upload_file_router)
-app.include_router(feedback_router)
-app.include_router(memories_router)
-app.include_router(admin_users_router)
-app.include_router(admin_skills_router)
+ROUTERS = [
+    signin_router,
+    signup_router,
+    chat_router,
+    new_conversation_router,
+    delete_conversation_router,
+    update_conversation_router,
+    list_conversation_router,
+    list_message_router,
+    delete_file_router,
+    get_file_router,
+    list_files_router,
+    download_file_router,
+    upload_file_router,
+    feedback_router,
+    memories_router,
+    admin_users_router,
+    admin_skills_router,
+]
 
-# Lệnh chạy
-# uvicorn src.pre.api.main:app --reload
+
+def create_app(container: ApiContainer) -> FastAPI:
+    '''
+    Tạo FastAPI app. Tầng pre không tự lắp ráp phụ thuộc:
+    container (CSDL, agent, JWT...) do entries_point lấy từ bootstrap rồi truyền vào đây.
+    '''
+    app = FastAPI()
+    app.state.container = container  # Router lấy lại qua Depends(get_container)
+
+    # khai báo ra bao nhiêu router thì đưa hết vào ROUTERS
+    for router in ROUTERS:
+        app.include_router(router)
+
+    return app

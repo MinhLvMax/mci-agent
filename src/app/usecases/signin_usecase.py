@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
-from src.app.services.password_hasher import PasswordHasher
-from src.app.services.jwt_service import JWTService
+from src.app.ports.repositories import UsersRepository
+from src.app.ports.security import PasswordHasher, TokenService
 
 
 class InactiveAccountError(Exception):
@@ -26,12 +25,13 @@ class SigninUseCase:
 
     def __init__(
             self,
-            user_repository: PostgresUsersRepository,
-            jwt_service: JWTService
+            user_repository: UsersRepository,
+            password_hasher: PasswordHasher,
+            token_service: TokenService
     ):
         self.user_repository = user_repository
-        self.password_hasher = PasswordHasher()
-        self.jwt_service = jwt_service  # Service tạo token, được truyền từ ngoài vào
+        self.password_hasher = password_hasher
+        self.token_service = token_service  # Service tạo token, được truyền từ ngoài vào
 
     def execute(
             self,
@@ -67,7 +67,7 @@ class SigninUseCase:
                 "Account is not active"
             )
 
-        access_token = self.jwt_service.create_access_token(  # Chỉ tạo token khi email và mật khẩu đều đúng
+        access_token = self.token_service.create_access_token(  # Chỉ tạo token khi email và mật khẩu đều đúng
             user_id=user.id,  # Lưu user id vào claim "sub" của token
         )
 

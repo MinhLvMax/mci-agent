@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 
-class WorkspaceService:
+class LocalWorkspaceService:
     """
     Service chịu trách nhiệm xác định workspace vật lý
     tương ứng với từng user và conversation.

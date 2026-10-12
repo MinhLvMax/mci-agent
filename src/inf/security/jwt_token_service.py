@@ -1,0 +1,54 @@
+from datetime import datetime, timedelta, timezone
+
+import jwt
+
+from src.app.ports.security import InvalidTokenError, TokenExpiredError
+
+
+class JWTTokenService:
+    '''Triển khai port TokenService (src/app/ports/security.py) bằng PyJWT'''
+
+    def __init__(
+            self,
+            secret_key: str,
+            algorithm: str,
+            expire_minutes: int
+    ):
+        self.secret_key = secret_key
+        self.algorithm = algorithm
+        self.expire_minutes = expire_minutes
+
+    def create_access_token(self, user_id: int) -> str:
+        expire = (
+                datetime.now(timezone.utc)
+                + timedelta(minutes=self.expire_minutes)
+        )
+
+        payload = {
+            "sub": str(user_id),
+            "exp": expire
+        }
+
+        return jwt.encode(
+            payload,
+            self.secret_key,
+            algorithm=self.algorithm
+        )
+
+    def decode_access_token(self, token: str) -> int:
+        try:
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                options={"require": ["exp", "sub"]}  # Từ chối token thiếu hạn dùng hoặc thiếu user id
+            )
+
+        # Đổi lỗi của PyJWT thành lỗi của port để tầng trên không phụ thuộc thư viện
+        except jwt.ExpiredSignatureError as e:  # Token đúng chữ ký nhưng đã quá hạn
+            raise TokenExpiredError("Access token expired") from e
+
+        except jwt.InvalidTokenError as e:  # Token bị sửa, sai chữ ký hoặc sai định dạng
+            raise InvalidTokenError("Invalid access token") from e
+
+        return int(payload["sub"])

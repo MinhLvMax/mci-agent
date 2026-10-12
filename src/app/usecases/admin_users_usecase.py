@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 
-import psycopg
-
-from src.app.services.password_hasher import PasswordHasher
-from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
+from src.app.ports.security import PasswordHasher
+from src.app.ports.errors import DuplicateRecordError
+from src.app.ports.repositories import UsersRepository
 from src.app.usecases.signup_usecase import EmailAlreadyExistsError, validate_email, validate_password
 from src.dom.entities.user import User
 
@@ -30,9 +29,9 @@ class UpdateUserCommand:
 class AdminUsersUsecase:
     '''Nghiệp vụ trang quản trị người dùng: kích hoạt/khoá, đổi email, đổi quyền, đặt lại mật khẩu'''
 
-    def __init__(self, user_repository: PostgresUsersRepository):
+    def __init__(self, user_repository: UsersRepository, password_hasher: PasswordHasher):
         self.user_repository = user_repository
-        self.password_hasher = PasswordHasher()
+        self.password_hasher = password_hasher
 
     def list_users(self) -> list[User]:
         return self.user_repository.list_all()
@@ -72,8 +71,7 @@ class AdminUsersUsecase:
                 role=command.role,
                 is_active=command.is_active,
             )
-        except psycopg.errors.UniqueViolation:  # Hai admin đổi sang cùng email cùng lúc
-            self.user_repository.connection.rollback()
+        except DuplicateRecordError:  # Hai admin đổi sang cùng email cùng lúc
             raise EmailAlreadyExistsError("Email already registered")
 
     def reset_password(self, user_id: int, new_password: str):

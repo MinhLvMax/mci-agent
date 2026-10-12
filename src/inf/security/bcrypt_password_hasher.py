@@ -1,9 +1,9 @@
-# app/services/password_hasher.py
+# src/inf/security/bcrypt_password_hasher.py
 
 import bcrypt
 
 
-class PasswordHasher:
+class BcryptPasswordHasher:
 
     def hash(
             self,

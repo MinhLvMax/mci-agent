@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
+from src.app.ports.repositories import MessagesRepository
 from src.dom.entities.message import Message
 
 
@@ -14,7 +14,7 @@ class ListMessegeUseCaseResult:
 
 
 class ListMessegeUsecase:
-    def __init__(self, message_repository: PostgreMessegesRepository):
+    def __init__(self, message_repository: MessagesRepository):
         self.message_repository = message_repository
 
     def execute(self, command: ListMessegeUseCaseCommand) -> ListMessegeUseCaseResult:

@@ -1,10 +1,9 @@
 import re
 from dataclasses import dataclass
 
-import psycopg
-
-from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
-from src.app.services.password_hasher import PasswordHasher
+from src.app.ports.errors import DuplicateRecordError
+from src.app.ports.repositories import UsersRepository
+from src.app.ports.security import PasswordHasher
 from src.dom.entities.user import User
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")  # Kiểm tra dạng "ten@mien.duoi", đủ chặn lỗi gõ nhầm
@@ -59,10 +58,11 @@ class SignupUseCase:
 
     def __init__(
             self,
-            user_repository: PostgresUsersRepository,
+            user_repository: UsersRepository,
+            password_hasher: PasswordHasher,
     ):
         self.user_repository = user_repository
-        self.password_hasher = PasswordHasher()
+        self.password_hasher = password_hasher
 
     def execute(
             self,
@@ -84,7 +84,7 @@ class SignupUseCase:
                 )
             )
 
-        except psycopg.errors.UniqueViolation:  # Hai người đăng ký cùng email cùng lúc, lọt qua bước kiểm tra trên
+        except DuplicateRecordError:  # Hai người đăng ký cùng email cùng lúc, lọt qua bước kiểm tra trên
             raise EmailAlreadyExistsError("Email already registered")
 
         return SignupUserResult(

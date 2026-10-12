@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 
 from src.app.ports.model_reasoner import ModelReasoner
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
+from src.app.ports.repositories import ConversationsRepository
 from src.dom.context import Context
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.message.text_message import TextMessage
@@ -35,7 +35,7 @@ class GenerateTitleUsecase:
     def __init__(
             self,
             reasoner: ModelReasoner,
-            conversation_repository: PostgreConversationsRepository,
+            conversation_repository: ConversationsRepository,
     ):
         self.reasoner = reasoner
         self.conversation_repository = conversation_repository

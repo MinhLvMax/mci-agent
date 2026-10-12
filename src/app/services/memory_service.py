@@ -1,4 +1,4 @@
-from src.app.services.postgre_db.postgre_memories_repository import PostgreMemoriesRepository
+from src.app.ports.repositories import MemoriesRepository
 from src.dom.entities.memory import Memory
 
 MAX_MEMORY_CHARS = 500
@@ -15,7 +15,7 @@ class MemoryService:
     - scope org: luôn tạo đề xuất pending, admin duyệt mới có hiệu lực (kể cả khi là sửa quy định cũ).
     '''
 
-    def __init__(self, repository: PostgreMemoriesRepository):
+    def __init__(self, repository: MemoriesRepository):
         self.repository = repository
 
     def remember(

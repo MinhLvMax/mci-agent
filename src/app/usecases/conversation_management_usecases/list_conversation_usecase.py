@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
+from src.app.ports.repositories import ConversationsRepository
 from src.dom.entities.conversation import Conversation
 
 
@@ -15,7 +15,7 @@ class ListConversationUseCaseResult:
 
 
 class ListConversationUsecase:
-    def __init__(self, conversation_repository: PostgreConversationsRepository):
+    def __init__(self, conversation_repository: ConversationsRepository):
         self.conversation_repository = conversation_repository
 
     def execute(self, command: ListConversationUseCaseCommand) -> ListConversationUseCaseResult:

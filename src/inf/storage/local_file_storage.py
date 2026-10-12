@@ -9,7 +9,7 @@ import zipfile
 from typing import Any
 
 
-class FileStorage:
+class LocalFileStorage:
     """
     Service chịu trách nhiệm thao tác với file vật lý trong workspace.
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from src.app.ports.model_reasoner import ModelReasoner
 from src.app.services.memory_service import MemoryService
-from src.app.services.postgre_db.postgre_memories_repository import PostgreMemoriesRepository
+from src.app.ports.repositories import MemoriesRepository
 from src.dom.context import Context
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.entities.memory import Memory
@@ -59,7 +59,7 @@ class ExtractLessonsUsecase:
             self,
             reasoner: ModelReasoner,
             memory_service: MemoryService,
-            memories_repository: PostgreMemoriesRepository,
+            memories_repository: MemoriesRepository,
     ):
         self.reasoner = reasoner
         self.memory_service = memory_service
@@ -82,9 +82,9 @@ class ExtractLessonsUsecase:
                     replace_memory_id=lesson.get("replace_memory_id"),
                 ))
             except Exception:
-                # Một bài học lỗi (vd replace_memory_id sai) thì bỏ qua, các bài khác vẫn lưu
+                # Một bài học lỗi (vd replace_memory_id sai) thì bỏ qua, các bài khác vẫn lưu.
+                # Repository tự rollback phần ghi hỏng nên không cần dọn ở đây.
                 Config.logger.exception('Save extracted lesson failed: %s', lesson)
-                self.memories_repository.connection.rollback()
 
         return saved
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
-from src.app.services.workspace_service import WorkspaceService
+from src.app.ports.repositories import ConversationsRepository
+from src.app.ports.storage import WorkspaceService
 
 
 @dataclass
@@ -17,7 +17,7 @@ class DeleteConversationUseCaseResult:
 class DeleteConversationUsecase:
     def __init__(
             self,
-            conversation_repository: PostgreConversationsRepository,
+            conversation_repository: ConversationsRepository,
             workspace_service: WorkspaceService,
     ):
         self.conversation_repository = conversation_repository

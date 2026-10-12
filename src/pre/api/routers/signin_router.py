@@ -1,15 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.app.services.postgre_db import create_postgres_connection
-from src.app.services.postgre_db.postgre_users_repository import PostgresUsersRepository
+from src.pre.api.container import ApiContainer, get_container
 
 from src.app.usecases.signin_usecase import (
     SigninUseCase,
     SigninUserCommand,
     InactiveAccountError,
 )
-from src.bootstrap import build_jwt_service
 
 
 class SigninRequest(BaseModel):
@@ -35,31 +33,27 @@ signin_router = APIRouter(
     response_model=SigninResponse
 )
 def signin(
-        request: SigninRequest
+        request: SigninRequest,
+        container: ApiContainer = Depends(get_container),
 ):
-    # mở database connection
-    connection = create_postgres_connection()
-
     try:
+        # mở phiên CSDL, ra khỏi "with" là tự đóng
+        with container.unit_of_work() as uow:
 
-        # tạo repository
-        repository = PostgresUsersRepository(
-            connection
-        )
-
-        # tạo usecase
-        usecase = SigninUseCase(
-            repository,
-            jwt_service=build_jwt_service()  # Truyền service tạo token vào usecase
-        )
-
-        # gọi nghiệp vụ login
-        user = usecase.execute(
-            SigninUserCommand(
-                email=request.email,
-                password=request.password
+            # tạo usecase
+            usecase = SigninUseCase(
+                uow.users,
+                password_hasher=container.password_hasher(),
+                token_service=container.token_service()  # Truyền service tạo token vào usecase
             )
-        )
+
+            # gọi nghiệp vụ login
+            user = usecase.execute(
+                SigninUserCommand(
+                    email=request.email,
+                    password=request.password
+                )
+            )
 
         # trả response
         return SigninResponse(
@@ -82,8 +76,3 @@ def signin(
             status_code=401,
             detail=str(e)
         )
-
-    finally:
-
-        # đóng connection
-        connection.close()

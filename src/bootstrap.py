@@ -26,15 +26,17 @@ from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
 # from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
-from src.app.services.workspace_service import WorkspaceService
+from src.inf.storage.local_workspace_service import LocalWorkspaceService
+from src.inf.storage.local_file_storage import LocalFileStorage
+from src.inf.storage.local_workspace_scanner import LocalWorkspaceScanner
+from src.inf.security.bcrypt_password_hasher import BcryptPasswordHasher
+from src.inf.security.jwt_token_service import JWTTokenService
+from src.app.ports.security import PasswordHasher, TokenService
+from src.app.ports.storage import FileStorage, WorkspaceScanner, WorkspaceService
 from src.app.services.memory_service import MemoryService
-# from src.app.services.postgre_db.postgre_messages_repository import PostgreMessegesRepository
-# from src.app.services.postgre_db.postgre_conversations_repository import PostgreConversationsRepository
-# from src.app.services.postgre_db import create_postgres_connection
-# from src.app.usecases.chat_usecase import ChatUseCase
-from src.app.services.jwt_service import JWTService
+from src.inf.persistence.postgres.unit_of_work import PostgresUnitOfWork
+from src.app.ports.unit_of_work import UnitOfWork
 from src.dom.entities.skill import Skill
-# from src.pre.controllers.agent.agent_controller import AgentController
 from src.config import Config
 
 
@@ -150,13 +152,13 @@ def build_workspace_service() -> WorkspaceService:
     ROOT_AGENT_WORKSPACE là thư mục gốc chứa toàn bộ
     workspace của các user/conversation.
     """
-    return WorkspaceService(
+    return LocalWorkspaceService(
         workspace_root=Config.AGENT_ROOT_WORKSPACE
     )
 
 
-def build_jwt_service() -> JWTService:
-    return JWTService(
+def build_token_service() -> TokenService:
+    return JWTTokenService(
         secret_key=Config.JWT_SECRET_KEY,  # Khóa bí mật dùng để ký và kiểm tra token
         algorithm=Config.JWT_ALGORITHM,  # Thuật toán ký, ví dụ HS256
         expire_minutes=Config.JWT_EXPIRE_MINUTES,  # Số phút token còn hiệu lực
@@ -184,7 +186,67 @@ def build_agent_service(
         ),
     )
 
-# def build_agent_controller():
-#     return AgentController(
-#         agent=build_agent_service()
-#     )
+
+def build_password_hasher() -> PasswordHasher:
+    return BcryptPasswordHasher()
+
+
+def build_file_storage(workspace_root: Path) -> FileStorage:
+    '''Đọc/ghi file vật lý, chỉ trong workspace_root (thường là workspace của một conversation)'''
+    return LocalFileStorage(workspace_root=workspace_root)
+
+
+def build_workspace_scanner() -> WorkspaceScanner:
+    return LocalWorkspaceScanner()
+
+
+def build_unit_of_work() -> UnitOfWork:
+    '''Phiên CSDL: hiện dùng PostgreSQL, đổi CSDL thì chỉ cần thay adapter ở đây'''
+    return PostgresUnitOfWork()
+
+
+class AppContainer:
+    '''
+    Gom các factory ở trên thành một đối tượng để truyền cho tầng giao tiếp (API).
+    Khớp với Protocol ApiContainer ở src/pre/api/container.py mà không cần import tầng pre.
+    '''
+
+    def unit_of_work(self) -> UnitOfWork:
+        return build_unit_of_work()
+
+    def token_service(self) -> TokenService:
+        return build_token_service()
+
+    def password_hasher(self) -> PasswordHasher:
+        return build_password_hasher()
+
+    def workspace_service(self) -> WorkspaceService:
+        return build_workspace_service()
+
+    def file_storage(self, workspace_root: Path) -> FileStorage:
+        return build_file_storage(workspace_root)
+
+    def workspace_scanner(self) -> WorkspaceScanner:
+        return build_workspace_scanner()
+
+    def agent_service(
+            self,
+            workspace_dir: Path,
+            skills: list[Skill],
+            memory_service: MemoryService | None = None,
+            user_id: int | None = None,
+            conversation_id: int | None = None,
+    ) -> AgentService:
+        return build_agent_service(
+            workspace_dir,
+            skills,
+            memory_service=memory_service,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+
+    def title_reasoner(self):
+        return build_title_reasoner()
+
+    def lesson_reasoner(self):
+        return build_lesson_reasoner()

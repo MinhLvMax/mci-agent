@@ -1,5 +1,6 @@
 import psycopg
 from src.dom.entities.user import User
+from src.inf.persistence.postgres.errors import translate_unique_violation
 
 
 class PostgresUsersRepository:
@@ -43,7 +44,7 @@ class PostgresUsersRepository:
             self,
             user: User
     ) -> User:
-        with self.connection.cursor() as cursor:
+        with translate_unique_violation(self.connection, "Email already registered"), self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO users(
@@ -138,7 +139,7 @@ class PostgresUsersRepository:
             is_active: bool | None = None,
     ) -> User | None:
         '''Chỉ ghi các cột được truyền vào (khác None)'''
-        with self.connection.cursor() as cursor:
+        with translate_unique_violation(self.connection, "Email already registered"), self.connection.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE users
@@ -211,8 +212,8 @@ class PostgresUsersRepository:
 
 
 if __name__ == '__main__':
-    from src.app.services.postgre_db import create_postgres_connection
-    from src.app.services.password_hasher import PasswordHasher
+    from src.inf.persistence.postgres import create_postgres_connection
+    from src.inf.security.bcrypt_password_hasher import BcryptPasswordHasher as PasswordHasher
 
     hasher = PasswordHasher()
     conn = create_postgres_connection()
