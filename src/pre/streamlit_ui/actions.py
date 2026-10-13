@@ -1,3 +1,6 @@
+import csv
+import io
+import json
 from typing import Iterator
 
 import requests
@@ -8,6 +11,10 @@ from src.pre.call_api.api_client import UnauthorizedError
 from src.log import get_logger
 
 logger = get_logger(__name__)
+
+
+class ModelChoiceError(Exception):
+    '''Model / chế độ suy luận người dùng chọn không dùng được, message là câu tiếng Việt để hiện toast'''
 
 
 class UIActions:
@@ -73,6 +80,9 @@ class UIActions:
             4. Đóng file đang mở của conversation trước.
             """
 
+        # Lưu file đang sửa trước khi rời hội thoại cũ, lỗi cũng không chặn việc chuyển hội thoại
+        self.save_opened_file()
+
         # Conversation hiện tại.
         self.state.current_conversation_id = conversation_id
 
@@ -125,8 +135,13 @@ class UIActions:
         for event in self.api.chat_api.chat_stream(
                 conversation_id=self.state.current_conversation_id,
                 new_message=prompt,
+                model_id=self.state.selected_model_id,
+                reasoning_mode=self.state.selected_reasoning_mode,
         ):
             if event["type"] == "error":
+                if event["data"].get("kind") == "model":
+                    self.state.available_models = None  # Admin có thể vừa sửa/tắt model, lần vẽ sau tải lại
+                    raise ModelChoiceError(event["data"]["message"])
                 raise RuntimeError(event["data"]["message"])
 
             # Bị gián đoạn: backend đã lưu tóm tắt các bước đã làm, hiện luôn không cần tải lại.
@@ -153,6 +168,15 @@ class UIActions:
         self.list_files(
             conversation_id=self.state.current_conversation_id
         )
+
+    def list_models(self):
+        '''
+        Model người dùng được chọn khi chat. Lưu trong phiên để không gọi API mỗi lần vẽ lại,
+        đặt state.available_models = None để tải lại.
+        '''
+        if self.state.available_models is None:
+            self.state.available_models = self.api.models_api.list()
+        return self.state.available_models
 
     def create_new_conversation(self, title: str | None = None):
         response = self.api.conversations_api.new(
@@ -269,6 +293,31 @@ class UIActions:
     def admin_update_skill(self, skill_id: int, **changes):
         return self.api.admin_api.update_skill(skill_id, **changes)
 
+    def admin_delete_skill(self, skill_id: int):
+        self.api.admin_api.delete_skill(skill_id)
+
+    def admin_list_models(self):
+        return self.api.admin_api.list_models()
+
+    def admin_list_providers(self):
+        return self.api.admin_api.list_providers()
+
+    def admin_create_model(self, **fields):
+        return self._model_changed(self.api.admin_api.create_model(**fields))
+
+    def admin_update_model(self, model_id: int, **changes):
+        return self._model_changed(self.api.admin_api.update_model(model_id, **changes))
+
+    def admin_delete_model(self, model_id: int):
+        self._model_changed(self.api.admin_api.delete_model(model_id))
+
+    def admin_test_model(self, **fields):
+        return self.api.admin_api.test_model(**fields)
+
+    def _model_changed(self, result):
+        self.state.available_models = None  # Danh sách chọn model ở khung chat tải lại theo thay đổi của admin
+        return result
+
     def list_files(
             self,
             conversation_id: int | str
@@ -307,15 +356,28 @@ class UIActions:
         Lúc này mới gọi backend để lấy content.
         """
 
+        if not self.save_opened_file():  # File đang mở lưu lỗi thì giữ nguyên để user không mất phần đã sửa
+            return
+
         response = self.api.file_api.get(
             file_id=file_id
         )
+
+        # /get_file/ trả json/csv đã parse, muốn sửa phải lấy text gốc
+        try:
+            raw_content = self.api.file_api.download(
+                file_id=file_id
+            ).decode("utf-8")
+        except UnicodeDecodeError:  # Không phải UTF-8 thì chỉ cho xem, không cho sửa
+            raw_content = None
 
         self.state.opened_file = StateManager.OpenedFile(
             file_id=response.file.id,
             name=response.file.name,
             item_type=response.file.file_type or "",
             content=response.content,
+            raw_content=raw_content,
+            saved_content=raw_content,
         )
 
     def open_file_without_preview(
@@ -384,12 +446,57 @@ class UIActions:
 
         return errors
 
-    def close_file(self):
+    def close_file(self) -> bool:
         """
-        Đóng file đang xem, quay lại danh sách file.
+        Lưu rồi đóng file đang xem, quay lại danh sách file.
+
+        Lưu lỗi thì không đóng, để user còn thấy lỗi và phần đã sửa.
         """
 
+        if not self.save_opened_file():
+            return False
+
         self.state.opened_file = None
+        return True
+
+    def save_opened_file(self) -> bool:
+        """
+        Lưu file đang mở nếu có thay đổi. Trả về False nếu lưu lỗi.
+
+        Gọi khi rời ô soạn thảo, khi đóng file, đóng dialog, mở file khác hay đổi hội thoại.
+        """
+
+        file = self.state.opened_file
+
+        if file is None or not file.is_dirty:  # Không có gì để lưu
+            return True
+
+        try:
+            self.api.file_api.save(
+                file_id=file.file_id,
+                content=file.raw_content,
+            )
+
+        except UnauthorizedError:
+            raise  # Để nơi gọi đưa về màn hình đăng nhập
+
+        except requests.HTTPError as e:
+            file.save_error = f"Lưu không thành công: {e.response.text}"
+            return False
+
+        except requests.RequestException as e:
+            file.save_error = f"Lưu không thành công, không kết nối được máy chủ ({e})"
+            return False
+
+        file.saved_content = file.raw_content
+        file.content = parse_for_preview(file.item_type, file.raw_content)  # Chế độ Xem hiện đúng bản mới
+        file.save_error = None
+
+        self.list_files(  # Size trong danh sách file đổi theo
+            conversation_id=self.state.current_conversation_id
+        )
+
+        return True
 
     def download_file(
             self,
@@ -439,3 +546,28 @@ class UIActions:
         )
 
         return True
+
+
+def parse_for_preview(
+        item_type: str,
+        text: str,
+) -> object:
+    """
+    Parse text vừa lưu giống cách backend /get_file/ parse, để chế độ Xem không phải gọi lại API.
+
+    JSON sai cú pháp thì trả nguyên text, chế độ Xem vẫn hiện được.
+    """
+
+    file_type = item_type.lower()
+
+    if file_type == "json":
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return text
+
+    if file_type == "csv":
+        text = text.removeprefix("\ufeff")  # Bỏ BOM như backend đọc utf-8-sig
+        return list(csv.DictReader(io.StringIO(text)))
+
+    return text

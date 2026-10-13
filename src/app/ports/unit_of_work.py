@@ -6,6 +6,7 @@ from src.app.ports.repositories import (
     FilesRepository,
     MemoriesRepository,
     MessagesRepository,
+    ModelsRepository,
     SkillsRepository,
     UsersRepository,
 )
@@ -26,6 +27,7 @@ class UnitOfWork(Protocol):
     skills: SkillsRepository
     memories: MemoriesRepository
     feedbacks: FeedbacksRepository
+    models: ModelsRepository
 
     def rollback(self) -> None:
         '''Huỷ phần đang dở sau khi có lỗi để phiên còn dùng tiếp được'''

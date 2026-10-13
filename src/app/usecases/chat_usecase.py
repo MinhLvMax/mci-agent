@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Iterator
+from src.app.ports.model_reasoner import ModelUnavailableError
 from src.app.services.agent_service import AgentService
 from src.dom.agent_event import AgentEvent
 from src.dom.context import Context
@@ -110,6 +111,10 @@ class ChatUseCase:
             yield from self._stream_and_save(command, messages, reasoning)
 
         except Exception as e:
+            if isinstance(e, ModelUnavailableError) and not reasoning:
+                # Model chọn sai ngay từ đầu, chưa làm được gì: không lưu để người dùng đổi model rồi gửi lại
+                raise
+
             # Lỗi giữa chừng (vd model lỗi 500): vẫn lưu tin nhắn kèm tóm tắt các bước đã làm
             # để user gõ "tiếp tục" thì agent biết làm tiếp từ đâu
             interrupted_message = self._save_interrupted(command, reasoning, e)

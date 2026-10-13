@@ -15,10 +15,12 @@ from src.pre.api.routers.files.get_file_router import get_file_router
 from src.pre.api.routers.files.list_files_router import list_files_router
 from src.pre.api.routers.files.download_file_router import download_file_router
 from src.pre.api.routers.files.upload_file_router import upload_file_router
+from src.pre.api.routers.files.save_file_router import save_file_router
 from src.pre.api.routers.feedback_router import feedback_router
 from src.pre.api.routers.memories_router import memories_router
 from src.pre.api.routers.admin_users_router import admin_users_router
 from src.pre.api.routers.admin_skills_router import admin_skills_router
+from src.pre.api.routers.admin_models_router import admin_models_router, models_router
 
 
 ROUTERS = [
@@ -35,10 +37,13 @@ ROUTERS = [
     list_files_router,
     download_file_router,
     upload_file_router,
+    save_file_router,
     feedback_router,
     memories_router,
     admin_users_router,
     admin_skills_router,
+    admin_models_router,
+    models_router,
 ]
 
 

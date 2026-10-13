@@ -1,13 +1,15 @@
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.pre.api.container import ApiContainer, get_container
 from src.pre.api.dependencies import get_current_user_id, get_owned_conversation
 
+from src.app.ports.model_reasoner import ModelUnavailableError
 from src.app.ports.unit_of_work import UnitOfWork
+from src.app.services.chat_model_selector import select_chat_model
 from src.app.services.memory_service import MemoryService
 from src.app.services.system_prompt_builder import build_system_prompt
 from src.app.services.workspace_sync_service import WorkspaceSyncService
@@ -28,6 +30,8 @@ from src.config import Config
 class ChatRequest(BaseModel):
     conversation_id: int
     new_message: str
+    model_id: int | None = None  # None thì dùng model mặc định admin đặt
+    reasoning_mode: str | None = None  # None thì dùng chế độ đầu tiên của model (nếu model có)
 
 
 class ChatResponse(BaseModel):
@@ -65,14 +69,22 @@ def chat(
         memories = uow.memories.list_for_prompt(user_id)
 
         history = uow.messages.get_messages(conversation_id=conversation.id)
-        usecase = ChatUseCase(
-            agent=container.agent_service(
+        try:
+            ai_model, reasoning_mode = select_chat_model(uow.models, request.model_id, request.reasoning_mode)
+            agent = container.agent_service(
                 conversation_workspace_dir,
                 skills,
                 memory_service=MemoryService(uow.memories),
                 user_id=user_id,
                 conversation_id=conversation.id,
-            ),
+                ai_model=ai_model,
+                reasoning_mode=reasoning_mode,
+            )
+        except ModelUnavailableError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        usecase = ChatUseCase(
+            agent=agent,
             conversation_repository=uow.messages,
             system_prompt=build_system_prompt(skills, memories),
         )
@@ -86,6 +98,8 @@ def chat(
                     )
                 )
             )
+        except ModelUnavailableError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         finally:
             # ============================================================
             # Agent đã chạy xong (kể cả khi chạy lỗi giữa chừng)
@@ -157,18 +171,22 @@ def chat_stream(
                     and not history
             )
 
-            usecase = ChatUseCase(
-                agent=container.agent_service(
-                    conversation_workspace_dir,
-                    skills,
-                    memory_service=MemoryService(uow.memories),
-                    user_id=user_id,
-                    conversation_id=conversation.id,
-                ),
-                conversation_repository=uow.messages,
-                system_prompt=build_system_prompt(skills, memories),
-            )
             try:
+                ai_model, reasoning_mode = select_chat_model(uow.models, request.model_id, request.reasoning_mode)
+                usecase = ChatUseCase(
+                    agent=container.agent_service(
+                        conversation_workspace_dir,
+                        skills,
+                        memory_service=MemoryService(uow.memories),
+                        user_id=user_id,
+                        conversation_id=conversation.id,
+                        ai_model=ai_model,
+                        reasoning_mode=reasoning_mode,
+                    ),
+                    conversation_repository=uow.messages,
+                    system_prompt=build_system_prompt(skills, memories),
+                )
+
                 assistant_reply = None
                 for event in usecase.execute_stream(
                         ChatUseCaseCommand(
@@ -197,6 +215,12 @@ def chat_stream(
                     title_event = _generate_title(container, uow, conversation.id, request.new_message, assistant_reply)
                     if title_event is not None:
                         yield json.dumps(title_event.to_dict(), ensure_ascii=False) + "\n"
+            except ModelUnavailableError as e:
+                # Chọn sai model / chế độ suy luận: kind = "model" để UI hiện toast thay vì khung lỗi agent
+                yield json.dumps(
+                    AgentEvent(type='error', data={"message": str(e), "kind": "model"}).to_dict(),
+                    ensure_ascii=False
+                ) + "\n"
             except Exception as e:
                 # Status 200 đã gửi đi rồi, chỉ còn cách báo lỗi bằng một event
                 Config.logger.exception('Chat stream failed')

@@ -31,7 +31,7 @@ def _to_skill(row) -> Skill:
 class PostgreSkillsRepository:
     '''
     Đọc/ghi skill do admin quản lý trong bảng skills (trang Quản trị).
-    Không xoá hẳn skill: muốn bỏ thì tắt is_active.
+    Muốn tạm ngưng thì tắt is_active, xoá là xoá hẳn khỏi bảng.
     '''
 
     def __init__(self, connection: psycopg.Connection):
@@ -150,6 +150,14 @@ class PostgreSkillsRepository:
 
         self.connection.commit()
         return _to_skill(row) if row else None
+
+    def delete(self, skill_id: int) -> bool:
+        with self.connection.cursor() as cursor:
+            cursor.execute("DELETE FROM skills WHERE id = %s RETURNING id", (skill_id,))
+            row = cursor.fetchone()
+
+        self.connection.commit()
+        return row is not None
 
 
 if __name__ == '__main__':

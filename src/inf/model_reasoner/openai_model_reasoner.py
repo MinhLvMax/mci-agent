@@ -1,6 +1,6 @@
 import json
 from typing import Generator
-from openai import NOT_GIVEN, OpenAI
+from openai import NOT_GIVEN, APIStatusError, OpenAI
 from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
 from src.dom.decision import Decision
@@ -14,9 +14,13 @@ from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.agent_event import AgentEvent
 from src.config import Config
+from src.inf.model_reasoner.errors import translate_api_error
 
 
 class OpenAIModelReasoner(ModelReasoner):
+    # Mã lưu ở cột models.provider và tên hiển thị trên giao diện: nguồn duy nhất, giao diện lấy qua API
+    PROVIDER = "openai"
+    PROVIDER_LABEL = "OpenAI"
 
     def __init__(
         self,
@@ -93,6 +97,12 @@ class OpenAIModelReasoner(ModelReasoner):
         # Call OpenAI
         # -------------------------
 
+        try:
+            return self._call_api(input_items, tool_schemas)
+        except APIStatusError as e:
+            raise translate_api_error(e, "OpenAI", self.model, self.reasoning_effort) from e
+
+    def _call_api(self, input_items: list, tool_schemas: list):
         return self.client.responses.create(
             model=self.model,
             input=input_items,

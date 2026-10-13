@@ -14,6 +14,12 @@ class FileStorage(Protocol):
 
     def write(self, path: str, content: Any, overwrite: bool = True) -> Path: ...
 
+    def write_text(self, path: str, content: str) -> Path:
+        '''Ghi nguyên văn chuỗi, không serialize theo loại file (dùng khi user tự sửa json/csv)'''
+
+    def is_supported(self, path: str) -> bool:
+        '''File có đọc/ghi được dạng text không'''
+
     def write_bytes_unique(self, filename: str, data: bytes) -> str:
         '''Ghi file, trùng tên thì tự đổi tên. Trả về đường dẫn thực tế đã dùng'''
 

@@ -22,8 +22,12 @@ from src.inf.tools.skill.load_skill_tool import LoadSkillTool
 from src.inf.tools.memory.forget_tool import ForgetTool
 
 from src.inf.model_reasoner.openai_model_reasoner import OpenAIModelReasoner
-# from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
-# from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
+from src.inf.model_reasoner.groq_model_reasoner import GroqModelReasoner
+from src.inf.model_reasoner.ollama_model_reasoner import OllamaModelReasoner
+from src.inf.model_reasoner.anthropic_model_reasoner import AnthropicModelReasoner
+from src.inf.model_reasoner.errors import missing_api_key
+from src.app.ports.model_reasoner import ModelReasoner, ModelUnavailableError, ProviderInfo
+from src.dom.entities.ai_model import AIModel
 from src.app.services.tool_executor import ToolExecutor
 from src.app.services.agent_service import AgentService
 from src.inf.storage.local_workspace_service import LocalWorkspaceService
@@ -40,7 +44,59 @@ from src.dom.entities.skill import Skill
 from src.config import Config
 
 
+def _openai_reasoner(model_name: str, reasoning_mode: str | None) -> ModelReasoner:
+    if not Config.OPEN_API_KEY:
+        raise missing_api_key("OpenAI")
+    return OpenAIModelReasoner(api_key=Config.OPEN_API_KEY, model=model_name, reasoning_effort=reasoning_mode)
+
+
+def _groq_reasoner(model_name: str, reasoning_mode: str | None) -> ModelReasoner:
+    if not Config.GROQ_API_KEY:
+        raise missing_api_key("Groq")
+    return GroqModelReasoner(api_key=Config.GROQ_API_KEY, model=model_name, reasoning_effort=reasoning_mode)
+
+
+def _ollama_reasoner(model_name: str, reasoning_mode: str | None) -> ModelReasoner:
+    # qwen3/deepseek nhận think True/False (admin nhập 'true'/'false'), gpt-oss nhận 'low'/'medium'/'high'
+    think = {"true": True, "false": False}.get((reasoning_mode or "").lower(), reasoning_mode or False)
+    return OllamaModelReasoner(model=model_name, api_key=Config.OLLAMA_API_KEY, think=think)
+
+
+def _anthropic_reasoner(model_name: str, reasoning_mode: str | None) -> ModelReasoner:
+    # Chế độ suy luận là effort của Claude: 'low' / 'medium' / 'high' / 'xhigh' / 'max' tuỳ model
+    if not Config.ANTHROPIC_API_KEY:
+        raise missing_api_key("Anthropic")
+    return AnthropicModelReasoner(api_key=Config.ANTHROPIC_API_KEY, model=model_name, reasoning_effort=reasoning_mode)
+
+
+# Adapter -> hàm dựng reasoner. Mã và tên hiển thị của nhà cung cấp do chính adapter khai báo
+# (PROVIDER / PROVIDER_LABEL), thêm nhà cung cấp mới thì viết adapter rồi thêm một dòng ở đây.
+_ADAPTERS = [
+    (OpenAIModelReasoner, _openai_reasoner),
+    (GroqModelReasoner, _groq_reasoner),
+    (OllamaModelReasoner, _ollama_reasoner),
+    (AnthropicModelReasoner, _anthropic_reasoner),
+]
+
+# Mã nhà cung cấp trong cột models.provider -> hàm dựng reasoner
+REASONER_FACTORIES = {adapter.PROVIDER: factory for adapter, factory in _ADAPTERS}
+
+# Danh sách nhà cung cấp gửi cho giao diện (form thêm model, tên hiển thị)
+PROVIDERS = [ProviderInfo(name=adapter.PROVIDER, label=adapter.PROVIDER_LABEL) for adapter, _ in _ADAPTERS]
+
+
+def build_chat_reasoner(ai_model: AIModel, reasoning_mode: str | None) -> ModelReasoner:
+    '''Reasoner cho model người dùng chọn khi chat'''
+    factory = REASONER_FACTORIES.get(ai_model.provider)
+    if factory is None:
+        raise ModelUnavailableError(
+            f"Nhà cung cấp '{ai_model.provider}' của model {ai_model.display_name} chưa được hỗ trợ. Báo admin kiểm tra lại."
+        )
+    return factory(ai_model.model_name, reasoning_mode)
+
+
 def build_reasoner():
+    '''Model cố định cho việc chạy ngầm (đặt tên hội thoại...), không phụ thuộc lựa chọn của người dùng'''
     # return GroqModelReasoner(
     #     api_key=Config.GROQ_API_KEY,
     #     model='qwen/qwen3.8-27b'
@@ -171,8 +227,11 @@ def build_agent_service(
         memory_service: MemoryService | None = None,
         user_id: int | None = None,
         conversation_id: int | None = None,
+        ai_model: AIModel | None = None,
+        reasoning_mode: str | None = None,
 ):
-    reasoner = build_reasoner()
+    # Không truyền model (vd chạy thử ngoài API) thì dùng model cố định như trước
+    reasoner = build_chat_reasoner(ai_model, reasoning_mode) if ai_model else build_reasoner()
 
     return AgentService(
         model_reasoner=reasoner,
@@ -236,6 +295,8 @@ class AppContainer:
             memory_service: MemoryService | None = None,
             user_id: int | None = None,
             conversation_id: int | None = None,
+            ai_model: AIModel | None = None,
+            reasoning_mode: str | None = None,
     ) -> AgentService:
         return build_agent_service(
             workspace_dir,
@@ -243,7 +304,15 @@ class AppContainer:
             memory_service=memory_service,
             user_id=user_id,
             conversation_id=conversation_id,
+            ai_model=ai_model,
+            reasoning_mode=reasoning_mode,
         )
+
+    def supported_providers(self) -> list[ProviderInfo]:
+        return list(PROVIDERS)
+
+    def chat_reasoner(self, ai_model: AIModel, reasoning_mode: str | None) -> ModelReasoner:
+        return build_chat_reasoner(ai_model, reasoning_mode)
 
     def title_reasoner(self):
         return build_title_reasoner()

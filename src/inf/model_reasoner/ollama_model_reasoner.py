@@ -3,6 +3,7 @@ import uuid
 from typing import Generator, Literal
 
 import httpx
+import pydantic
 from ollama import Client, ResponseError
 
 from src.app.ports.model_reasoner import ModelReasoner
@@ -18,9 +19,14 @@ from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.agent_event import AgentEvent
 from src.config import Config
+from src.inf.model_reasoner.errors import missing_api_key, tools_not_supported, wrong_model_name, wrong_reasoning_mode
 
 
 class OllamaModelReasoner(ModelReasoner):
+    # Mã lưu ở cột models.provider và tên hiển thị trên giao diện: nguồn duy nhất, giao diện lấy qua API
+    PROVIDER = "ollama"
+    PROVIDER_LABEL = "Ollama"
+
     CLOUD_HOST = "https://ollama.com"
     MAX_ATTEMPTS = 3  # Tổng số lần gọi khi gặp lỗi tạm thời
     RETRY_DELAY_SECONDS = 2  # Lần gọi lại thứ n chờ n * 2 giây
@@ -89,7 +95,17 @@ class OllamaModelReasoner(ModelReasoner):
 
                 break
 
+            except pydantic.ValidationError as e:
+                # Thư viện ollama kiểm tra tham số trước khi gửi: think chỉ nhận true/false/low/medium/high
+                if any(error["loc"][:1] == ("think",) for error in e.errors()):
+                    raise wrong_reasoning_mode(self.model, self.think) from e
+                raise
+
             except (ResponseError, ConnectionError, httpx.TransportError) as e:
+                # Sai tên model / chế độ suy luận thì gọi lại cũng vô ích, báo luôn cho người dùng
+                if isinstance(e, ResponseError) and (config_error := self._config_error(e)):
+                    raise config_error from e
+
                 # Lỗi tạm thời của server (500, 429, mất kết nối) thì gọi lại sau một lúc.
                 # Đã trả chữ cho người dùng thì không gọi lại nữa để câu trả lời không bị lặp.
                 if content or attempt == self.MAX_ATTEMPTS or not _is_transient(e):
@@ -112,6 +128,20 @@ class OllamaModelReasoner(ModelReasoner):
         return FinalDecision(
             final_content=content
         )
+
+    def _config_error(self, e: ResponseError):
+        '''Lỗi do cấu hình model sai (tên, chế độ suy luận, key) thì đổi thành ModelUnavailableError, không gọi lại'''
+        message = (e.error or "").lower()
+
+        if e.status_code == 401:
+            return missing_api_key("Ollama")
+        if e.status_code == 404 or "not found" in message:
+            return wrong_model_name("Ollama", self.model)
+        if "think" in message:  # vd: "qwen2.5" does not support thinking / invalid think value
+            return wrong_reasoning_mode(self.model, self.think)
+        if "does not support tools" in message:
+            return tools_not_supported("Ollama", self.model)
+        return None
 
     def _convert_message(self, message: BaseMessage) -> dict:
         '''Chuyển đổi các message của nghiệp vụ thành dạng mà ollama hiểu và làm việc'''

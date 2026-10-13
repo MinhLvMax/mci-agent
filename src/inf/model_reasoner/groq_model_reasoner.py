@@ -1,6 +1,6 @@
 import json
 from typing import Generator
-from groq import NOT_GIVEN, Groq
+from groq import NOT_GIVEN, APIStatusError, Groq
 
 from src.app.ports.model_reasoner import ModelReasoner
 from src.dom.context import Context
@@ -15,17 +15,25 @@ from src.dom.decision.tool_call_decision import ToolCallDecision
 from src.dom.decision.final_decision import FinalDecision
 from src.dom.agent_event import AgentEvent
 from src.config import Config
+from src.inf.model_reasoner.errors import translate_api_error
 
 
 class GroqModelReasoner(ModelReasoner):
+    # Mã lưu ở cột models.provider và tên hiển thị trên giao diện: nguồn duy nhất, giao diện lấy qua API
+    PROVIDER = "groq"
+    PROVIDER_LABEL = "Groq"
+
     def __init__(self,
                  api_key: str | None = None,
-                 model: str | None = None):
+                 model: str | None = None,
+                 reasoning_effort: str | None = None):
         api_key = api_key or Config.GROQ_API_KEY
         self.client = Groq(
             api_key=api_key
         )
         self.model = model or "openai/gpt-oss-20b"
+        # Mức suy luận, giá trị tuỳ model (gpt-oss: 'low'/'medium'/'high', qwen3: 'none'/'default'), None thì không gửi
+        self.reasoning_effort = reasoning_effort
 
     def decide(self, context: Context, tools: list[Tool]) -> Decision:
         messages = [
@@ -38,13 +46,17 @@ class GroqModelReasoner(ModelReasoner):
             for tool in tools
         ]
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            # Gọi không kèm tool (vd: tool nội bộ cần LLM trả JSON) thì không gửi tham số tools
-            tools=tool_schemas or NOT_GIVEN,
-            tool_choice="auto" if tool_schemas else NOT_GIVEN,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                # Gọi không kèm tool (vd: tool nội bộ cần LLM trả JSON) thì không gửi tham số tools
+                tools=tool_schemas or NOT_GIVEN,
+                tool_choice="auto" if tool_schemas else NOT_GIVEN,
+                reasoning_effort=self.reasoning_effort or NOT_GIVEN,
+            )
+        except APIStatusError as e:
+            raise translate_api_error(e, "Groq", self.model, self.reasoning_effort) from e
 
         message = response.choices[0].message
 

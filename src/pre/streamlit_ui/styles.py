@@ -174,6 +174,39 @@ div[role="dialog"]:has(.st-key-fullscreen_view) {
     overflow-y: auto;
 }
 
+/* ===== Click-để-sửa (xem inline_edit.py) ===== */
+
+/* Nút ẩn do JS bấm hộ khi click vào nội dung / rời ô soạn thảo */
+[class*="st-key-ie_enter__"],
+[class*="st-key-ie_exit__"] {
+    display: none !important;
+}
+
+/* Chế độ đọc: gợi ý click được để sửa */
+[class*="st-key-ie_view__"] {
+    cursor: text;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s;
+}
+
+[class*="st-key-ie_view__"]:hover {
+    background-color: rgba(128, 128, 128, 0.08);
+}
+
+/* Ô sửa file: chữ đơn cách, cao gần hết khung chứa */
+[class*="st-key-ie_editor__file_"] textarea {
+    font-family: "Source Code Pro", monospace;
+    font-size: 0.85rem;
+}
+
+.st-key-file_preview [class*="st-key-ie_editor__file_"] textarea {
+    min-height: calc(100dvh - 19rem);
+}
+
+.st-key-fullscreen_view [class*="st-key-ie_editor__file_"] textarea {
+    min-height: 70dvh;
+}
+
 /* Màn hình hẹp: hai panel xếp dọc, giảm chiều cao tối thiểu */
 @media (max-width: 900px) {
     .st-key-chat_panel { min-height: 300px; }

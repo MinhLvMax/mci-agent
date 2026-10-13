@@ -6,6 +6,7 @@ Adapter cụ thể (vd PostgreSQL) nằm ở tầng inf và tự triển khai c�
 '''
 from typing import Protocol
 
+from src.dom.entities.ai_model import AIModel
 from src.dom.entities.conversation import Conversation
 from src.dom.entities.feedback import Feedback
 from src.dom.entities.file import File
@@ -114,6 +115,31 @@ class SkillsRepository(Protocol):
 
     def update(self, skill: Skill) -> Skill | None:
         '''Ghi đè toàn bộ trường. Tên trùng thì raise DuplicateRecordError'''
+
+    def delete(self, skill_id: int) -> bool:
+        '''False nếu không có skill này'''
+
+
+class ModelsRepository(Protocol):
+    def list_all(self) -> list[AIModel]:
+        '''Tất cả model kể cả đang tắt, cho trang quản trị'''
+
+    def list_active(self) -> list[AIModel]:
+        '''Model đang bật, người dùng được chọn khi chat'''
+
+    def get_by_id(self, model_id: int) -> AIModel | None: ...
+
+    def get_default(self) -> AIModel | None:
+        '''Model mặc định đang bật, None nếu chưa đặt hoặc đã bị tắt'''
+
+    def create(self, model: AIModel) -> AIModel:
+        '''Trùng provider + model_name thì raise DuplicateRecordError. is_default thì bỏ mặc định ở model khác'''
+
+    def update(self, model: AIModel) -> AIModel | None:
+        '''Ghi đè toàn bộ trường, quy tắc như create'''
+
+    def delete(self, model_id: int) -> bool:
+        '''False nếu không có model này'''
 
 
 class MemoriesRepository(Protocol):

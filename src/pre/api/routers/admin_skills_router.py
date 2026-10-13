@@ -93,6 +93,21 @@ def update_skill(
     return _run(container, lambda usecase: usecase.update_skill(skill_id, _to_changes(request)))
 
 
+@admin_skills_router.delete(path='/{skill_id}')
+def delete_skill(
+        skill_id: int,
+        _: int = Depends(require_admin),
+        container: ApiContainer = Depends(get_container),
+) -> dict:
+    try:
+        with container.unit_of_work() as uow:
+            AdminSkillsUsecase(uow.skills).delete_skill(skill_id)
+    except SkillNotFoundError:
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    return {"success": True}
+
+
 def _run(container: ApiContainer, action) -> SkillResponse:
     '''Mở phiên CSDL, chạy nghiệp vụ, đổi lỗi nghiệp vụ thành mã HTTP'''
     try:

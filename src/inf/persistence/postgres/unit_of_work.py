@@ -6,6 +6,7 @@ from src.inf.persistence.postgres.postgre_feedbacks_repository import PostgreFee
 from src.inf.persistence.postgres.postgre_files_repository import PostgreFilesRepository
 from src.inf.persistence.postgres.postgre_memories_repository import PostgreMemoriesRepository
 from src.inf.persistence.postgres.postgre_messages_repository import PostgreMessegesRepository
+from src.inf.persistence.postgres.postgre_models_repository import PostgreModelsRepository
 from src.inf.persistence.postgres.postgre_skills_repository import PostgreSkillsRepository
 from src.inf.persistence.postgres.postgre_users_repository import PostgresUsersRepository
 
@@ -32,6 +33,7 @@ class PostgresUnitOfWork:
         self.skills = PostgreSkillsRepository(self.connection)
         self.memories = PostgreMemoriesRepository(self.connection)
         self.feedbacks = PostgreFeedbacksRepository(self.connection)
+        self.models = PostgreModelsRepository(self.connection)
 
         return self
 

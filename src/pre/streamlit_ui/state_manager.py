@@ -105,6 +105,60 @@ class StateManager:
     def pending_prompt(self, value: str | None):
         st.session_state["pending_prompt"] = value
 
+    # Model đang bật lấy từ backend, None là chưa tải hoặc cần tải lại
+    @property
+    def available_models(self) -> list | None:
+        return st.session_state.get("available_models")
+
+    @available_models.setter
+    def available_models(self, value: list | None):
+        st.session_state["available_models"] = value
+
+    # Model và chế độ suy luận người dùng chọn cho các lượt chat, giữ trong phiên.
+    # None là chưa chọn: dùng model mặc định admin đặt.
+    @property
+    def selected_provider(self) -> str | None:
+        '''Nhà cung cấp dùng để lọc ô chọn model ("__all__" là tất cả)'''
+        return st.session_state.get("selected_provider")
+
+    @selected_provider.setter
+    def selected_provider(self, value: str | None):
+        st.session_state["selected_provider"] = value
+
+    @property
+    def selected_model_id(self) -> int | None:
+        return st.session_state.get("selected_model_id")
+
+    @selected_model_id.setter
+    def selected_model_id(self, value: int | None):
+        st.session_state["selected_model_id"] = value
+
+    @property
+    def selected_reasoning_mode(self) -> str | None:
+        return st.session_state.get("selected_reasoning_mode")
+
+    @selected_reasoning_mode.setter
+    def selected_reasoning_mode(self, value: str | None):
+        st.session_state["selected_reasoning_mode"] = value
+
+    # Tin nhắn gửi không thành (model chọn bị lỗi), lần vẽ sau điền lại vào ô nhập
+    @property
+    def restore_prompt(self) -> str | None:
+        return st.session_state.get("restore_prompt")
+
+    @restore_prompt.setter
+    def restore_prompt(self, value: str | None):
+        st.session_state["restore_prompt"] = value
+
+    # Thông báo hiện bằng toast ở lần vẽ sau (vd model chọn bị lỗi), hiện xong thì xoá
+    @property
+    def chat_toast(self) -> str | None:
+        return st.session_state.get("chat_toast")
+
+    @chat_toast.setter
+    def chat_toast(self, value: str | None):
+        st.session_state["chat_toast"] = value
+
     # Lỗi của lượt chat gần nhất, để hiện trong khung chat.
     @property
     def chat_error(self) -> str | None:
@@ -169,7 +223,15 @@ class StateManager:
         file_id: int
         name: str
         item_type: str
-        content: object
+        content: object  # Nội dung đã parse để xem (json -> dict, csv -> list[dict])
+        raw_content: str | None = None  # Text thô đang sửa, None là file không sửa được
+        saved_content: str | None = None  # Text đã lưu trên server, khác raw_content là chưa lưu
+        save_error: str | None = None  # Lỗi của lần lưu gần nhất
+        editing_in: str | None = None  # Khung đang ở chế độ sửa ("_panel" / "_fullscreen"), None là đang đọc
+
+        @property
+        def is_dirty(self) -> bool:
+            return self.raw_content is not None and self.raw_content != self.saved_content
 
     @property
     def opened_file(self) -> OpenedFile | None:

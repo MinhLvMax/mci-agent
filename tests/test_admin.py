@@ -8,6 +8,7 @@ from dataclasses import replace
 from src.app.usecases.admin_skills_usecase import (
     AdminSkillsUsecase,
     SkillChanges,
+    SkillNotFoundError,
     SkillValidationError,
 )
 from src.app.usecases.admin_users_usecase import AdminRuleError, AdminUsersUsecase, UpdateUserCommand
@@ -66,6 +67,9 @@ class FakeSkillsRepository:
     def update(self, skill):
         self.skills[skill.id] = skill
         return skill
+
+    def delete(self, skill_id):
+        return self.skills.pop(skill_id, None) is not None
 
 
 def make_user(id, email, role='user', is_active=True):
@@ -148,6 +152,16 @@ class AdminSkillsUsecaseTest(unittest.TestCase):
         ])
         skill = AdminSkillsUsecase(repo).update_skill(1, SkillChanges(is_active=False))
         self.assertEqual((skill.name, skill.instructions, skill.is_active), ('core', 'Bạn là trợ lý.', False))
+
+    def test_delete_skill(self):
+        repo = FakeSkillsRepository([Skill(id=1, name='core', description='x', instructions='')])
+        usecase = AdminSkillsUsecase(repo)
+
+        usecase.delete_skill(1)
+
+        self.assertNotIn(1, repo.skills)
+        with self.assertRaises(SkillNotFoundError):  # Xoá lần nữa: không còn skill
+            usecase.delete_skill(1)
 
 
 if __name__ == '__main__':

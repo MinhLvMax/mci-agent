@@ -231,6 +231,47 @@ class LocalFileStorage:
 
         return file_path
 
+    def write_text(
+            self,
+            path: str,
+            content: str,
+    ) -> Path:
+        """
+        Ghi nguyên văn chuỗi vào file đã có, không parse theo extension.
+
+        Khác write():
+        - .json/.csv cũng nhận str chứ không đòi dict/list;
+        - dùng khi user tự sửa file trên giao diện, giữ đúng những gì user gõ.
+        """
+
+        file_path = self._resolve_path(path)
+
+        if not file_path.is_file():
+            raise FileNotFoundError(
+                f"File not found: {path}"
+            )
+
+        if not self.is_supported(path):
+            raise ValueError(
+                f"Unsupported file type: {file_path.suffix}"
+            )
+
+        # newline="" để không đổi "\n" thành "\r\n" trên Windows
+        with file_path.open("w", encoding="utf-8", newline="") as file:
+            file.write(content)
+
+        return file_path
+
+    def is_supported(
+            self,
+            path: str
+    ) -> bool:
+        """
+        File có thuộc nhóm đọc/ghi được dạng text không.
+        """
+
+        return Path(path).suffix.lower() in self.SUPPORTED_EXTENSIONS
+
     def write_bytes_unique(
             self,
             filename: str,

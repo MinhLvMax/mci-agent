@@ -15,7 +15,7 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / 'src'
 
 # Thư viện hạ tầng: chỉ adapter ở tầng inf mới được dùng trực tiếp
-INFRA_LIBS = ['psycopg', 'jwt', 'bcrypt', 'openai', 'groq', 'ollama', 'tavily', 'ddgs']
+INFRA_LIBS = ['psycopg', 'jwt', 'bcrypt', 'openai', 'groq', 'ollama', 'anthropic', 'tavily', 'ddgs']
 
 # Tầng -> các module KHÔNG được import
 FORBIDDEN = {

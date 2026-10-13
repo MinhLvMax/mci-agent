@@ -6,6 +6,7 @@ import streamlit as st
 from src.pre.streamlit_ui.state_manager import StateManager
 from src.pre.streamlit_ui.actions import UIActions
 from src.pre.streamlit_ui.styles import render_empty_state, render_panel_header
+from src.pre.streamlit_ui.inline_edit import render_click_to_edit
 from src.pre.call_api.api_client import UnauthorizedError
 
 FILE_ICONS = {
@@ -425,7 +426,7 @@ def render_file_preview_header(
 ):
     # Một hàng gồm:
     #
-    # [back] [icon tên file..........] [toàn màn hình]
+    # [back] [icon tên file..........] [lưu khi đang sửa] [toàn màn hình]
     #
     with st.container(
             key="file_preview_header",  # CSS dựa vào key này để trừ chiều cao khung cuộn (xem styles.py)
@@ -436,9 +437,9 @@ def render_file_preview_header(
                 ":material/arrow_back:",
                 key="close_file",
                 type="tertiary",
-                help="Quay lại danh sách file",
+                help="Lưu và quay lại danh sách file",
         ):
-            action.close_file()
+            action.close_file()  # Lưu lỗi thì file vẫn mở, lỗi hiện ngay dưới header
 
             st.rerun()
 
@@ -454,6 +455,16 @@ def render_file_preview_header(
 
         st.space("stretch")
 
+        if file.editing_in is not None:  # Đang sửa: bấm lưu là lưu và quay về chế độ đọc
+            st.button(
+                ":material/save:",
+                key="save_file",
+                type="tertiary",
+                help="Lưu (click ra ngoài ô soạn thảo cũng tự lưu)",
+                on_click=_save_file_text,
+                args=(action, None, file.editing_in),
+            )
+
         if st.button(
                 ":material/fullscreen:",
                 key="fullscreen_file",
@@ -465,8 +476,24 @@ def render_file_preview_header(
                 action,
             )
 
+    if file.save_error:
+        st.error(file.save_error, icon=":material/error:")
 
-@st.dialog("Xem file", icon=":material/description:", width="large")
+
+def _on_fullscreen_dismiss():
+    """
+    Bấm X đóng dialog: ô soạn thảo mất focus nên on_change đã lưu trước đó,
+    ở đây chỉ đưa dialog về chế độ đọc cho lần mở sau. Callback xong Streamlit tự rerun
+    để panel bên ngoài hiện đúng nội dung mới.
+    """
+
+    file = StateManager().opened_file
+
+    if file is not None and file.editing_in == "_fullscreen":
+        file.editing_in = None
+
+
+@st.dialog("File", icon=":material/description:", width="large", on_dismiss=_on_fullscreen_dismiss)
 def file_fullscreen_dialog(
         file: StateManager.OpenedFile,
         action: UIActions,
@@ -551,6 +578,35 @@ def render_file_content(
     key_suffix tránh trùng key widget khi cùng một file được vẽ ở hai nơi.
     """
 
+    if file.raw_content is not None:  # File text: đọc trước, click vào nội dung mới sửa
+        view = key_suffix or "_panel"  # Panel và dialog sửa độc lập
+
+        render_click_to_edit(
+            key=f"file_{file.file_id}{view}",
+            editing=file.editing_in == view,
+            text=file.raw_content,
+            render_view=lambda: render_file_view(file, action, key_suffix),
+            on_save=lambda text: _save_file_text(action, text, view),
+            set_editing=lambda editing: _set_file_editing(action, view if editing else None),
+        )
+        return
+
+    render_file_view(
+        file,
+        action,
+        key_suffix,
+    )
+
+
+def render_file_view(
+        file: StateManager.OpenedFile,
+        action: UIActions,
+        key_suffix: str = "",
+):
+    """
+    Chế độ đọc: render nội dung theo từng loại file.
+    """
+
     file_type = file.item_type.lower()
 
     # Không xem trước được (pdf, ảnh, file không có đuôi...)
@@ -614,6 +670,50 @@ def render_file_content(
         st.write(
             file.content
         )
+
+
+def _set_file_editing(
+        action: UIActions,
+        view: str | None,
+):
+    file = action.state.opened_file
+
+    if file is not None:
+        file.editing_in = view
+
+
+def _save_file_text(
+        action: UIActions,
+        text: str | None,
+        view: str,
+) -> bool:
+    """
+    Callback lưu của khung click-để-sửa và nút lưu trên header.
+
+    text=None là lưu nội dung đã có (nút lưu: ô soạn thảo vừa mất focus nên đã gửi chữ mới).
+    Chỉ khi lưu xong mới về chế độ đọc, lỗi thì ở lại để không mất chữ.
+    """
+
+    file = action.state.opened_file
+
+    if file is None:
+        return False
+
+    if text is not None:
+        file.raw_content = text
+
+    try:
+        saved = action.save_opened_file()
+
+    except UnauthorizedError as e:  # Callback chạy ngoài try của main.py nên phải tự xử lý hết phiên
+        action.state.logout()
+        action.state.auth_notice = str(e)
+        return False
+
+    if saved and text is None:  # Nút lưu trên header thì thoát luôn chế độ sửa
+        file.editing_in = None
+
+    return saved
 
 
 def format_size(

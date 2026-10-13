@@ -4,9 +4,12 @@ from src.pre.streamlit_ui.root_layout.workspace_layout import render_workspace
 from src.pre.streamlit_ui.root_layout.chat_layout import render_chat, render_tool_call, AVATARS
 from src.pre.streamlit_ui.root_layout.side_bar_layout import render_sidebar, rename_conversation_dialog, feedback_dialog
 from src.pre.streamlit_ui.state_manager import StateManager
-from src.pre.streamlit_ui.actions import UIActions
+from src.pre.streamlit_ui.actions import ModelChoiceError, UIActions
 from src.pre.streamlit_ui.root_layout.login_layout import render_login
 from src.pre.streamlit_ui.styles import inject_styles
+from src.pre.streamlit_ui.labels import reasoning_label
+import requests
+
 from src.pre.call_api.api_client import UnauthorizedError
 from src.pre.streamlit_ui.root_layout.admin_layout import render_admin
 
@@ -59,6 +62,10 @@ def root_layout(
     has_conversation = state_manager.current_conversation_id is not None
     pending_prompt = state_manager.pending_prompt
 
+    if chat_toast := state_manager.chat_toast:  # Lỗi chọn model của lượt trước, hiện sau khi rerun
+        state_manager.chat_toast = None
+        st.toast(chat_toast, icon=":material/error:", duration="long")
+
     render_header(
         current_conversation,
         state_manager,
@@ -97,10 +104,22 @@ def root_layout(
                 on_rate=lambda rating: on_rate(actions, rating),
             )
 
+            render_model_picker(
+                actions,
+                state_manager,
+                disabled=pending_prompt is not None,
+            )
+
+            if (restore_prompt := state_manager.restore_prompt) is not None:
+                # Chỉ gán được trước khi vẽ ô nhập, nên lượt có lỗi lưu tạm rồi lượt sau mới điền lại
+                state_manager.restore_prompt = None
+                st.session_state["chat_input"] = restore_prompt
+
             prompt = st.chat_input(
                 "Nhập yêu cầu cho Agent..."
                 if has_conversation
                 else "Chọn hoặc tạo một hội thoại để bắt đầu",
+                key="chat_input",  # Có key để trả lại tin nhắn vào ô nhập khi model chọn bị lỗi
                 disabled=not has_conversation or pending_prompt is not None,
             )
 
@@ -141,10 +160,19 @@ def root_layout(
                     "assistant",
                     avatar=AVATARS["assistant"],
             ):
-                render_agent_stream(
-                    actions.send_message_stream(pending_prompt),
-                    state_manager,
-                )
+                try:
+                    render_agent_stream(
+                        actions.send_message_stream(pending_prompt),
+                        state_manager,
+                    )
+                except ModelChoiceError as e:
+                    # Model / chế độ suy luận chọn sai: backend không lưu gì, bỏ tin nhắn vừa hiện
+                    # và trả lại vào ô nhập để người dùng đổi model rồi gửi lại
+                    messages = state_manager.messages_in_current_conversation
+                    if messages and messages[-1].role == "user" and messages[-1].content == pending_prompt:
+                        messages.pop()
+                    state_manager.restore_prompt = pending_prompt
+                    state_manager.chat_toast = str(e)
 
         st.rerun()
 
@@ -203,11 +231,112 @@ def render_agent_stream(
             elif event["type"] == "done":
                 status.update(label="Đã suy nghĩ xong", state="complete", expanded=False)
 
-    except UnauthorizedError:  # Hết phiên thì không hiện như lỗi chat
-        raise  # Đẩy lên main.py để đưa user về màn hình đăng nhập
+    except (UnauthorizedError, ModelChoiceError):  # Hết phiên / chọn sai model thì không hiện như lỗi chat
+        raise  # Hết phiên: main.py đưa về màn hình đăng nhập; sai model: root_layout hiện toast
     except Exception as e:
         status.update(label="Agent gặp lỗi", state="error")
         state_manager.chat_error = str(e)
+
+
+ALL_PROVIDERS = "__all__"  # Lựa chọn "Tất cả" trong ô nhà cung cấp
+
+
+def render_model_picker(
+        actions: UIActions,
+        state_manager: StateManager,
+        disabled: bool,
+):
+    """
+    Hàng chọn [Nhà cung cấp] [Model] [Suy luận] ngay trên ô nhập tin nhắn.
+
+    - Nhà cung cấp lấy từ các model đang bật trong CSDL, đứng đầu là "Tất cả" (mặc định).
+    - "Tất cả" thì ô model có mọi model, tên kèm nhà cung cấp; chọn một nhà cung cấp thì chỉ còn model của nó.
+    - Ô suy luận chỉ có các chế độ của riêng model đang chọn, model không có chế độ thì ẩn.
+    Lựa chọn giữ trong phiên và gửi kèm mỗi lượt chat (chỉ model_id + chế độ, nhà cung cấp chỉ để lọc).
+
+    Ba ô dùng key cố định và đặt giá trị qua session state (không truyền index):
+    truyền index thay đổi theo lựa chọn thì Streamlit coi là ô mới và làm mất lựa chọn kế tiếp của người dùng.
+    """
+
+    try:
+        models = actions.list_models()
+    except UnauthorizedError:
+        raise
+    except requests.RequestException:
+        st.caption(":material/error: Không tải được danh sách model.")
+        return
+
+    if not models:
+        st.caption(":material/warning: Chưa có model nào được bật, hãy báo admin.")
+        return
+
+    default = next((model for model in models if model.is_default), models[0])
+    providers = list(dict.fromkeys(model.provider for model in models))  # Giữ thứ tự, model mặc định đứng đầu
+    provider_options = [ALL_PROVIDERS, *providers]
+    provider_labels = {model.provider: model.provider_label for model in models}  # Tên do backend gửi kèm từng model
+
+    # Giá trị đang chọn không còn hợp lệ (lần đầu, admin vừa tắt model...) thì chọn lại trước khi vẽ ô
+    # Streamlit xoá giá trị của ô có key khi ô không được vẽ (vd sang trang Quản trị),
+    # nên lựa chọn còn được lưu riêng trong state_manager để lấy lại
+    if st.session_state.get("picker_provider") not in provider_options:
+        saved = state_manager.selected_provider
+        st.session_state["picker_provider"] = saved if saved in provider_options else ALL_PROVIDERS
+
+    with st.container(horizontal=True, vertical_alignment="center", gap="small", key="model_picker"):
+        provider = st.selectbox(
+            "Nhà cung cấp",
+            options=provider_options,
+            format_func=lambda p: "Tất cả nhà cung cấp" if p == ALL_PROVIDERS else provider_labels[p],
+            key="picker_provider",
+            label_visibility="collapsed",
+            disabled=disabled,
+            width=190,
+        )
+        state_manager.selected_provider = provider
+
+        shown = [model for model in models if provider == ALL_PROVIDERS or model.provider == provider]
+        by_id = {model.id: model for model in shown}
+
+        if st.session_state.get("picker_model") not in by_id:
+            # Đổi sang nhà cung cấp khác: giữ model đang chọn nếu thuộc, không thì model mặc định, không nữa thì model đầu
+            fallback = default.id if default.id in by_id else shown[0].id
+            st.session_state["picker_model"] = (
+                state_manager.selected_model_id if state_manager.selected_model_id in by_id else fallback
+            )
+
+        model_id = st.selectbox(
+            "Model",
+            options=list(by_id),
+            format_func=lambda id: (
+                f"{by_id[id].display_name} · {by_id[id].provider_label}"
+                if provider == ALL_PROVIDERS else by_id[id].display_name
+            ),
+            key="picker_model",
+            label_visibility="collapsed",
+            disabled=disabled,
+            width=260,
+        )
+        state_manager.selected_model_id = model_id
+
+        modes = by_id[model_id].reasoning_modes
+        if not modes:
+            state_manager.selected_reasoning_mode = None
+            return
+
+        if st.session_state.get("picker_reasoning") not in modes:
+            saved = state_manager.selected_reasoning_mode
+            # Chế độ đầu tiên admin nhập là mặc định
+            st.session_state["picker_reasoning"] = saved if saved in modes else modes[0]
+
+        state_manager.selected_reasoning_mode = st.selectbox(
+            "Suy luận",
+            options=modes,
+            format_func=lambda mode: f"Suy luận: {reasoning_label(mode)}",
+            key="picker_reasoning",
+            label_visibility="collapsed",
+            disabled=disabled,
+            width=180,
+        )
 
 
 def on_rate(

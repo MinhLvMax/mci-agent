@@ -35,13 +35,20 @@ class ChatAPI:
 
     def chat_stream(self,
                     conversation_id: str | int,
-                    new_message: str) -> Iterator[dict]:
-        '''Đọc dần từng dòng NDJSON backend gửi về, mỗi dòng là một event của agent'''
+                    new_message: str,
+                    model_id: int | None = None,
+                    reasoning_mode: str | None = None) -> Iterator[dict]:
+        '''
+        Đọc dần từng dòng NDJSON backend gửi về, mỗi dòng là một event của agent.
+        model_id None thì backend dùng model mặc định.
+        '''
         response = self.client.post(
             path='/chat/stream',
             json={
                 "conversation_id": conversation_id,
                 "new_message": new_message,
+                "model_id": model_id,
+                "reasoning_mode": reasoning_mode,
             },
             stream=True,  # Không chờ tải hết body, có dòng nào đọc dòng đó
         )

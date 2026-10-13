@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from src.pre.call_api.api_client import APIClient
+from src.pre.call_api.models_api import AIModelItem
 
 # Thông báo lỗi của backend -> câu tiếng Việt hiện trên trang quản trị
 ADMIN_ERRORS = {
@@ -14,6 +15,13 @@ ADMIN_ERRORS = {
     "config_json must be a JSON object": "config_json phải là một object JSON.",
     "config_json.tools must be a list of tool names": "config_json.tools phải là danh sách tên tool.",
     "Admin only": "Chỉ admin mới làm được việc này.",
+    "Skill not found": "Skill không còn tồn tại, có thể đã bị xoá.",
+    "Display name is required": "Hãy nhập tên hiển thị của model.",
+    "Model name is required": "Hãy nhập tên chuẩn của model (tên gửi lên API của nhà cung cấp).",
+    "Unsupported provider": "Nhà cung cấp này chưa được hỗ trợ.",
+    "Default model must be active": "Model mặc định phải đang bật.",
+    "Model already exists": "Nhà cung cấp này đã có model cùng tên chuẩn.",
+    "Model not found": "Model không còn tồn tại, có thể đã bị xoá.",
 }
 
 
@@ -59,7 +67,7 @@ def _check(response):
 
 
 class AdminAPI:
-    '''API trang quản trị: người dùng và skill. Memory hệ thống dùng MemoryAPI'''
+    '''API trang quản trị: người dùng, skill và model. Memory hệ thống dùng MemoryAPI'''
 
     def __init__(self, client: APIClient):
         self.client = client
@@ -84,3 +92,27 @@ class AdminAPI:
 
     def update_skill(self, skill_id: int, **changes) -> AdminSkill:
         return AdminSkill(**_check(self.client.patch(path=f'/admin/skills/{skill_id}', json=changes)))
+
+    def delete_skill(self, skill_id: int):
+        _check(self.client.delete(path=f'/admin/skills/{skill_id}'))
+
+    # ===== Model =====
+    def list_models(self) -> list[AIModelItem]:
+        return [AIModelItem(**item) for item in _check(self.client.get(path='/admin/models/'))]
+
+    def list_providers(self) -> list[dict]:
+        '''Nhà cung cấp đã có adapter: [{"name": mã lưu CSDL, "label": tên hiển thị}]'''
+        return _check(self.client.get(path='/admin/models/providers'))
+
+    def create_model(self, **fields) -> AIModelItem:
+        return AIModelItem(**_check(self.client.post(path='/admin/models/', json=fields)))
+
+    def update_model(self, model_id: int, **changes) -> AIModelItem:
+        return AIModelItem(**_check(self.client.patch(path=f'/admin/models/{model_id}', json=changes)))
+
+    def delete_model(self, model_id: int):
+        _check(self.client.delete(path=f'/admin/models/{model_id}'))
+
+    def test_model(self, **fields) -> list[dict]:
+        '''Chạy thử model với dữ liệu đang nhập, trả [{mode, ok, message, seconds}] mỗi chế độ suy luận một dòng'''
+        return _check(self.client.post(path='/admin/models/test', json=fields, timeout=300))

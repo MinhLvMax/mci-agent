@@ -171,6 +171,44 @@ class FileAPI:
         )
 
     # ========================================================
+    # SAVE FILE
+    # ========================================================
+
+    def save(
+            self,
+            file_id: int | str,
+            content: str,
+    ) -> File:
+        """
+        Ghi đè nội dung file bằng text user vừa sửa.
+
+        API:
+            POST /save_file/
+
+        Request:
+            {
+                "file_id": 15,
+                "content": "# Báo cáo..."
+            }
+
+        Trả về metadata mới (size, updated_at đã đổi).
+        """
+
+        response = self.client.post(
+            path="/save_file/",
+            json={
+                "file_id": file_id,
+                "content": content,
+            },
+        )
+
+        response.raise_for_status()
+
+        return self._parse_file(
+            response.json()["file"]
+        )
+
+    # ========================================================
     # DELETE FILE
     # ========================================================
 

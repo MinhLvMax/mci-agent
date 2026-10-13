@@ -68,6 +68,10 @@ class AdminSkillsUsecase:
         validate_skill(updated)
         return self._save(self.skills_repository.update, updated)
 
+    def delete_skill(self, skill_id: int):
+        if not self.skills_repository.delete(skill_id):
+            raise SkillNotFoundError(f"Skill {skill_id} not found")
+
     def _save(self, save, skill: Skill) -> Skill:
         try:
             return save(skill)

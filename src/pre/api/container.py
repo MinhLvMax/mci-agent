@@ -3,12 +3,13 @@ from typing import Protocol
 
 from fastapi import Request
 
-from src.app.ports.model_reasoner import ModelReasoner
+from src.app.ports.model_reasoner import ModelReasoner, ProviderInfo
 from src.app.ports.unit_of_work import UnitOfWork
 from src.app.services.agent_service import AgentService
 from src.app.ports.security import PasswordHasher, TokenService
 from src.app.ports.storage import FileStorage, WorkspaceScanner, WorkspaceService
 from src.app.services.memory_service import MemoryService
+from src.dom.entities.ai_model import AIModel
 from src.dom.entities.skill import Skill
 
 
@@ -42,7 +43,16 @@ class ApiContainer(Protocol):
             memory_service: MemoryService | None = None,
             user_id: int | None = None,
             conversation_id: int | None = None,
-    ) -> AgentService: ...
+            ai_model: AIModel | None = None,
+            reasoning_mode: str | None = None,
+    ) -> AgentService:
+        '''Agent chạy bằng model người dùng chọn. Cấu hình model sai thì raise ModelUnavailableError'''
+
+    def supported_providers(self) -> list[ProviderInfo]:
+        '''Nhà cung cấp model đã có adapter (mã + tên hiển thị do adapter khai báo), dùng cho trang quản trị và tên hiển thị'''
+
+    def chat_reasoner(self, ai_model: AIModel, reasoning_mode: str | None) -> ModelReasoner:
+        '''Reasoner của một model bất kỳ (kể cả chưa lưu), dùng để admin chạy thử. Cấu hình sai thì raise ModelUnavailableError'''
 
     def title_reasoner(self) -> ModelReasoner:
         '''Model đặt tên hội thoại'''
